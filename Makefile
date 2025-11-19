@@ -28,7 +28,7 @@ setup: ## Initial project setup (install deps, copy env, init db)
 
 install: ## Install Python dependencies
 	@echo "$(GREEN)📦 Installing dependencies...$(NC)"
-	pip install -e ".[dev]"
+	pip install -r requirements-dev.txt
 	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 
 clean: ## Clean up build artifacts and caches
