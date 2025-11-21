@@ -182,9 +182,7 @@ async def get_thread_replies(
                 content=message.content,
                 author_id=message.author_id,
                 author_username=author.username,
-                author_display_name=f"{author.first_name} {author.last_name}"
-                if author.first_name
-                else None,
+                author_display_name=author.display_name,
                 thread_id=message.thread_id,
                 message_type=message.message_type,
                 is_edited=message.edited_at is not None,
@@ -311,8 +309,7 @@ async def get_thread_participants(
         select(
             Message.author_id,
             User.username,
-            User.first_name,
-            User.last_name,
+            User.display_name,
             func.count(Message.id).label("reply_count"),
             func.min(Message.created_at).label("first_reply_at"),
             func.max(Message.created_at).label("last_reply_at"),
@@ -322,7 +319,7 @@ async def get_thread_participants(
             Message.thread_id == thread_id,
             Message.deleted_at.is_(None),
         )
-        .group_by(Message.author_id, User.username, User.first_name, User.last_name)
+        .group_by(Message.author_id, User.username, User.display_name)
         .order_by(desc("reply_count"))
     )
 
@@ -331,17 +328,11 @@ async def get_thread_participants(
 
     participants = []
     for row in rows:
-        display_name = None
-        if row.first_name:
-            display_name = (
-                f"{row.first_name} {row.last_name}" if row.last_name else row.first_name
-            )
-
         participants.append(
             ThreadParticipantResponse(
                 user_id=row.author_id,
                 username=row.username,
-                display_name=display_name,
+                display_name=row.display_name,
                 reply_count=row.reply_count,
                 first_reply_at=row.first_reply_at,
                 last_reply_at=row.last_reply_at,
