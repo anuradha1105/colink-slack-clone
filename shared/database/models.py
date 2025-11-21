@@ -63,9 +63,9 @@ class UserRole(str, PyEnum):
 class ChannelType(str, PyEnum):
     """Channel visibility type."""
 
-    PUBLIC = "public"
-    PRIVATE = "private"
-    DIRECT = "direct"
+    public = "PUBLIC"
+    private = "PRIVATE"
+    direct = "DIRECT"
 
 
 class MessageType(str, PyEnum):
@@ -165,7 +165,7 @@ class Channel(Base, TimestampMixin):
 
     # Channel type and visibility
     channel_type: Mapped[ChannelType] = mapped_column(
-        Enum(ChannelType), default=ChannelType.PUBLIC, nullable=False, index=True
+        String(20), default=ChannelType.public.value, nullable=False, index=True
     )
 
     # Creator and ownership
