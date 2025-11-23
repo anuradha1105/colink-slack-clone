@@ -103,7 +103,7 @@ async def get_unread_count(
 ):
     """Get unread notification count."""
     count = await notification_manager.get_unread_count(db, current_user.id)
-    return UnreadCountResponse(unread_count=count)
+    return UnreadCountResponse(count=count)
 
 
 @router.put("/{notification_id}/read", response_model=NotificationResponse)

@@ -90,3 +90,11 @@ class ThreadParticipantsResponse(BaseModel):
 
     participants: List[ThreadParticipantResponse]
     total_count: int
+
+
+class ThreadRepliesResponse(BaseModel):
+    """Response model for thread replies list."""
+
+    replies: List[ThreadReplyResponse]
+    total_count: int
+    has_more: bool = False

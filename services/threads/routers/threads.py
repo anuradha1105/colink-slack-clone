@@ -23,6 +23,7 @@ from ..schemas.threads import (
     ThreadListResponse,
     ThreadParticipantResponse,
     ThreadParticipantsResponse,
+    ThreadRepliesResponse,
     ThreadReplyResponse,
     ThreadResponse,
 )
@@ -141,7 +142,7 @@ async def get_thread(
 
 @router.get(
     "/threads/{thread_id}/replies",
-    response_model=List[ThreadReplyResponse],
+    response_model=ThreadRepliesResponse,
     dependencies=[Depends(security)],
 )
 async def get_thread_replies(
@@ -158,6 +159,18 @@ async def get_thread_replies(
     """
     # Verify access
     await verify_thread_access(thread_id, current_user.id, db)
+
+    # Get total count
+    count_stmt = (
+        select(func.count())
+        .select_from(Message)
+        .where(
+            Message.thread_id == thread_id,
+            Message.deleted_at.is_(None),
+        )
+    )
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar() or 0
 
     # Get replies
     stmt = (
@@ -193,7 +206,12 @@ async def get_thread_replies(
         )
 
     logger.info(f"Retrieved {len(replies)} replies for thread {thread_id}")
-    return replies
+
+    return ThreadRepliesResponse(
+        replies=replies,
+        total_count=total_count,
+        has_more=(offset + len(replies)) < total_count,
+    )
 
 
 @router.get(

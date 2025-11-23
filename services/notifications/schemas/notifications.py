@@ -71,7 +71,7 @@ class NotificationListResponse(BaseModel):
 class UnreadCountResponse(BaseModel):
     """Unread notification count."""
 
-    unread_count: int
+    count: int
 
 
 class MarkAllReadResponse(BaseModel):
