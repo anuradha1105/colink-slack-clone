@@ -5,11 +5,11 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import settings
-from middleware import AuthMiddleware
-from routers import files_router, health_router
-from services.kafka_producer import kafka_producer
-from services.minio_service import minio_service
+from .config import settings
+from .middleware import AuthMiddleware
+from .routers import files_router, health_router
+from .services.kafka_producer import kafka_producer
+from .services.minio_service import minio_service
 
 # Configure logging
 logging.basicConfig(
@@ -23,7 +23,70 @@ app = FastAPI(
     title="Files Service",
     description="File upload, download, and management service for Colink",
     version="1.0.0",
+    swagger_ui_init_oauth={
+        "clientId": settings.keycloak_client_id,
+        "appName": "Files Service",
+        "usePkceWithAuthorizationCodeGrant": True,
+    },
 )
+
+
+def custom_openapi():
+    """Customize OpenAPI schema to include security."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # Ensure components exists
+    if "components" not in openapi_schema:
+        openapi_schema["components"] = {}
+
+    # Add security schemes
+    openapi_schema["components"]["securitySchemes"] = {
+        "OAuth2PasswordBearer": {
+            "type": "oauth2",
+            "flows": {
+                "authorizationCode": {
+                    "authorizationUrl": f"{settings.keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/auth",
+                    "tokenUrl": f"{settings.keycloak_url}/realms/{settings.keycloak_realm}/protocol/openid-connect/token",
+                    "scopes": {
+                        "openid": "OpenID Connect",
+                        "profile": "User profile",
+                        "email": "Email address",
+                    },
+                }
+            },
+        },
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        },
+    }
+
+    # Apply security globally to all endpoints except health
+    for path, path_item in openapi_schema["paths"].items():
+        if "/health" not in path:  # Exclude health endpoint
+            for method in path_item.values():
+                if isinstance(method, dict) and "security" not in method:
+                    method["security"] = [
+                        {"BearerAuth": []},
+                        {"OAuth2PasswordBearer": ["openid", "profile", "email"]},
+                    ]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 # CORS middleware
 app.add_middleware(

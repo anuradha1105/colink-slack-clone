@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import File, User
 
-from config import settings
-from services.kafka_producer import kafka_producer
-from services.minio_service import minio_service
-from services.thumbnail_service import thumbnail_service
+from ..config import settings
+from .kafka_producer import kafka_producer
+from .minio_service import minio_service
+from .thumbnail_service import thumbnail_service
 
 logger = logging.getLogger(__name__)
 

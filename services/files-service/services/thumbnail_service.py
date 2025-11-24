@@ -6,7 +6,7 @@ from typing import Optional
 
 from PIL import Image
 
-from config import settings
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 

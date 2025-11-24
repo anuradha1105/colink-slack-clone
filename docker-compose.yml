@@ -16,7 +16,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Commented out due to Docker Desktop path issue with spaces
+      # - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U colink" ]
       interval: 5s
@@ -109,11 +110,12 @@ services:
       KC_HEALTH_ENABLED: "true"
     command:
       - start-dev
-      - --import-realm
+      # - --import-realm  # Commented out since realm file volume is disabled
     ports:
       - "8080:8080"
-    volumes:
-      - ./infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+    # Commented out due to Docker Desktop path issue with spaces
+    # volumes:
+    #   - ./infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json:ro
     depends_on:
       postgres:
         condition: service_healthy

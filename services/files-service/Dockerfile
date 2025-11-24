@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY services/files-service/requirements.txt .
+COPY services/files-service/requirements.txt ./services/files-service/
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r services/files-service/requirements.txt
 
 # Copy shared module
 COPY shared /app/shared
@@ -22,14 +22,8 @@ COPY shared /app/shared
 # Copy service code
 COPY services/files-service /app/services/files-service
 
-# Set working directory
-WORKDIR /app/services/files-service
-
-# Set python path
-ENV PYTHONPATH=/app/services/files-service:/app
-
 # Expose port
 EXPOSE 8007
 
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8007"]
+CMD ["uvicorn", "services.files-service.main:app", "--host", "0.0.0.0", "--port", "8007"]

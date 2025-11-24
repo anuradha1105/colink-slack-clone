@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 from minio import Minio
 from minio.error import S3Error
 
-from config import settings
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class MinIOService:
         self.bucket = settings.minio_bucket
         self.thumbnails_bucket = settings.minio_thumbnails_bucket
 
-    async def initialize_buckets(self):
+    def initialize_buckets(self):
         """Create buckets if they don't exist."""
         try:
             # Create main files bucket

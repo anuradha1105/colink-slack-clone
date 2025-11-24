@@ -10,16 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import User, get_db
 
-from dependencies import get_current_user, get_pagination_params
-from schemas.files import (
+from ..dependencies import get_current_user, get_pagination_params
+from ..schemas.files import (
     FileListResponse,
     FileResponse,
     FileUploadResponse,
     SignedUrlRequest,
     SignedUrlResponse,
 )
-from services.file_manager import file_manager
-from services.minio_service import minio_service
+from ..services.file_manager import file_manager
+from ..services.minio_service import minio_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
