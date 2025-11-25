@@ -110,6 +110,15 @@ async def startup_event():
     """Initialize services on startup."""
     logger.info("Starting Files Service...")
 
+    # Initialize database
+    try:
+        from shared.database import init_db
+        init_db(settings.database_url)
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+
     # Initialize MinIO buckets
     try:
         minio_service.initialize_buckets()
