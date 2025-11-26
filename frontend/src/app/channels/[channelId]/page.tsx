@@ -1,12 +1,15 @@
 'use client';
 
-import { use } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { use, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { channelApi, messageApi } from '@/lib/api';
 import { Channel, Message } from '@/types';
 import { ChannelHeader } from '@/components/ChannelHeader';
 import { MessageList } from '@/components/MessageList';
 import { MessageInput } from '@/components/MessageInput';
+import { TypingIndicator } from '@/components/TypingIndicator';
+import { useWebSocket } from '@/contexts/WebSocketContext';
+import { useAuthStore } from '@/store/authStore';
 
 interface ChannelPageProps {
   params: Promise<{
@@ -16,22 +19,139 @@ interface ChannelPageProps {
 
 export default function ChannelPage({ params }: ChannelPageProps) {
   const { channelId } = use(params);
+  const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
+  const { joinChannel, leaveChannel, onNewMessage, onMessageUpdated, onMessageDeleted, onTyping } = useWebSocket();
+  const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map()); // userId -> username
 
   const { data: channel, isLoading: channelLoading } = useQuery({
     queryKey: ['channel', channelId],
     queryFn: async () => {
-      const response = await channelApi.get<Channel>(`/channels/${channelId}`);
-      return response.data;
+      return await channelApi.get<Channel>(`/channels/${channelId}`);
     },
   });
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ['messages', channelId],
     queryFn: async () => {
-      const response = await messageApi.get<Message[]>(`/channels/${channelId}/messages`);
-      return response.data;
+      try {
+        console.log(`[MESSAGES QUERY] Fetching messages for channel: ${channelId}`);
+        const data = await messageApi.get<{messages: Message[], has_more: boolean, next_cursor?: string}>(`/channels/${channelId}/messages`);
+        console.log(`[MESSAGES QUERY] Raw API response:`, data);
+        console.log(`[MESSAGES QUERY] Number of messages:`, data.messages?.length || 0);
+
+        // Unwrap the messages array and map flat author fields to author object
+        if (Array.isArray(data.messages)) {
+          const messagesWithAuthor = data.messages.map(msg => ({
+            ...msg,
+            author: {
+              id: msg.author_id,
+              username: msg.author_username || '',
+              display_name: msg.author_display_name,
+              email: '',
+              status: 'ACTIVE' as const,
+              role: 'MEMBER' as const,
+            }
+          }));
+          // Reverse to show oldest first (messages come from API in desc order)
+          const reversed = messagesWithAuthor.reverse();
+          console.log(`[MESSAGES QUERY] Returning ${reversed.length} messages (reversed):`, reversed.map(m => ({ id: m.id, content: m.content.substring(0, 20) })));
+          return reversed;
+        }
+        console.log('[MESSAGES QUERY] No messages array in response, returning empty array');
+        return [];
+      } catch (error) {
+        console.error('[MESSAGES QUERY] Failed to fetch messages:', error);
+        return [];
+      }
     },
+    staleTime: 0, // Always refetch on mount
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
+
+  // Join/leave channel on WebSocket
+  useEffect(() => {
+    if (channelId) {
+      joinChannel(channelId);
+      return () => {
+        leaveChannel(channelId);
+      };
+    }
+  }, [channelId, joinChannel, leaveChannel]);
+
+  // Listen for new messages
+  useEffect(() => {
+    const unsubscribe = onNewMessage((newMessage) => {
+      if (newMessage.channel_id === channelId) {
+        queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
+          // Check if message already exists
+          if (old.some(msg => msg.id === newMessage.id)) {
+            return old;
+          }
+          return [...old, newMessage];
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [channelId, onNewMessage, queryClient]);
+
+  // Listen for message updates
+  useEffect(() => {
+    const unsubscribe = onMessageUpdated((updatedMessage) => {
+      if (updatedMessage.channel_id === channelId) {
+        queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
+          return old.map(msg =>
+            msg.id === updatedMessage.id ? updatedMessage : msg
+          );
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [channelId, onMessageUpdated, queryClient]);
+
+  // Listen for message deletions
+  useEffect(() => {
+    const unsubscribe = onMessageDeleted((messageId) => {
+      queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
+        return old.filter(msg => msg.id !== messageId);
+      });
+    });
+
+    return unsubscribe;
+  }, [channelId, onMessageDeleted, queryClient]);
+
+  // Listen for typing indicators
+  useEffect(() => {
+    const unsubscribe = onTyping((data) => {
+      if (data.channelId === channelId && data.userId !== currentUser?.id) {
+        setTypingUsers((prev) => {
+          const next = new Map(prev);
+          if (data.isTyping) {
+            // Get username from messages (if we have any from this user)
+            const userMessage = messages.find(m => m.author_id === data.userId);
+            const username = userMessage?.author?.username || data.userId;
+            next.set(data.userId, username);
+
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+              setTypingUsers((current) => {
+                const updated = new Map(current);
+                updated.delete(data.userId);
+                return updated;
+              });
+            }, 3000);
+          } else {
+            next.delete(data.userId);
+          }
+          return next;
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [channelId, onTyping, currentUser?.id, messages]);
 
   if (channelLoading) {
     return (
@@ -56,6 +176,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
     <div className="flex flex-col h-full">
       <ChannelHeader channel={channel} />
       <MessageList messages={messages} isLoading={messagesLoading} />
+      <TypingIndicator usernames={Array.from(typingUsers.values())} />
       <MessageInput channelId={channelId} />
     </div>
   );

@@ -26,6 +26,8 @@ export interface Message {
   channel_id: string;
   author_id: string;
   author?: User;
+  author_username?: string;
+  author_display_name?: string;
   content: string;
   thread_id?: string;
   message_type: 'text' | 'file' | 'system';

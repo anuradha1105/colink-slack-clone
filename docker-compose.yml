@@ -239,6 +239,37 @@ services:
       - colink-network
     restart: unless-stopped
 
+  websocket:
+    build:
+      context: .
+      dockerfile: services/websocket/Dockerfile
+    container_name: colink-websocket
+    ports:
+      - "${WEBSOCKET_PORT:-8009}:8009"
+    env_file:
+      - .env
+    environment:
+      - SERVICE_NAME=websocket
+      - PORT=8009
+      - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=colink
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8009/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - colink-network
+    restart: unless-stopped
+
   channel:
     build:
       context: .

@@ -1,16 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { channelApi } from '@/lib/api';
-import { Channel } from '@/types';
+import { channelApi, authApi } from '@/lib/api';
+import { Channel, User } from '@/types';
 import { Hash, Lock, ChevronDown, Plus, MessageSquare, Settings, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, logout } = useAuthStore();
   const [channelsExpanded, setChannelsExpanded] = useState(true);
   const [directMessagesExpanded, setDirectMessagesExpanded] = useState(true);
@@ -18,14 +21,68 @@ export function Sidebar() {
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => {
-      const response = await channelApi.get<Channel[]>('/channels');
-      return response.data;
+      try {
+        const data = await channelApi.get<Channel[]>('/channels');
+        console.log('Channels data:', data);
+        // Ensure we always return an array
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Failed to fetch channels:', error);
+        return [];
+      }
+    },
+  });
+
+  // Fetch all users for Direct Messages list
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      try {
+        const data = await authApi.get<User[]>('/auth/users');
+        console.log('Users data:', data);
+        // Ensure we always return an array
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        return [];
+      }
     },
   });
 
   const publicChannels = channels.filter(c => c.channel_type === 'PUBLIC');
   const privateChannels = channels.filter(c => c.channel_type === 'PRIVATE');
   const directMessages = channels.filter(c => c.channel_type === 'DIRECT');
+
+  // Get users excluding current user, limit to 12
+  const dmUsers = allUsers
+    .filter(u => u.id !== user?.id)
+    .slice(0, 12);
+
+  const createDMMutation = useMutation({
+    mutationFn: async (selectedUser: User) => {
+      // Use the dedicated DM endpoint which handles finding/creating DM channels
+      console.log('Creating/finding DM channel with user:', selectedUser.id);
+      const channel = await channelApi.post<Channel>('/channels/dm', {
+        other_user_id: selectedUser.id,
+      });
+      console.log('DM channel returned:', channel);
+      return channel;
+    },
+    onSuccess: (channel) => {
+      console.log('DM mutation success, navigating to:', channel.id);
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
+      router.push(`/channels/${channel.id}`);
+    },
+    onError: (error) => {
+      console.error('DM mutation error:', error);
+    },
+  });
+
+  const handleSelectUser = (selectedUser: User) => {
+    console.log('Selecting user:', selectedUser);
+    console.log('Current user:', user);
+    createDMMutation.mutate(selectedUser);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -63,20 +120,33 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto">
         {/* Public Channels */}
         <div className="px-2 py-2">
-          <button
-            onClick={() => setChannelsExpanded(!channelsExpanded)}
-            className="w-full flex items-center justify-between px-2 py-1 hover:bg-purple-800 rounded text-sm"
-          >
-            <span className="font-semibold">Channels</span>
+          <div className="w-full flex items-center justify-between px-2 py-1 text-sm">
+            <button
+              onClick={() => setChannelsExpanded(!channelsExpanded)}
+              className="flex-1 text-left font-semibold hover:opacity-80"
+            >
+              Channels
+            </button>
             <div className="flex items-center space-x-1">
-              <button className="hover:bg-purple-700 rounded p-0.5">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // TODO: Handle create channel
+                }}
+                className="hover:bg-purple-700 rounded p-0.5"
+              >
                 <Plus className="h-4 w-4" />
               </button>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${channelsExpanded ? '' : '-rotate-90'}`}
-              />
+              <button
+                onClick={() => setChannelsExpanded(!channelsExpanded)}
+                className="hover:bg-purple-700 rounded p-0.5"
+              >
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${channelsExpanded ? '' : '-rotate-90'}`}
+                />
+              </button>
             </div>
-          </button>
+          </div>
 
           {channelsExpanded && (
             <div className="mt-1 space-y-0.5">
@@ -135,43 +205,65 @@ export function Sidebar() {
 
         {/* Direct Messages */}
         <div className="px-2 py-2">
-          <button
-            onClick={() => setDirectMessagesExpanded(!directMessagesExpanded)}
-            className="w-full flex items-center justify-between px-2 py-1 hover:bg-purple-800 rounded text-sm"
-          >
-            <span className="font-semibold">Direct Messages</span>
+          <div className="w-full flex items-center justify-between px-2 py-1 text-sm">
+            <button
+              onClick={() => setDirectMessagesExpanded(!directMessagesExpanded)}
+              className="flex-1 text-left font-semibold hover:opacity-80"
+            >
+              Direct Messages
+            </button>
             <div className="flex items-center space-x-1">
-              <button className="hover:bg-purple-700 rounded p-0.5">
-                <Plus className="h-4 w-4" />
+              <button
+                onClick={() => setDirectMessagesExpanded(!directMessagesExpanded)}
+                className="hover:bg-purple-700 rounded p-0.5"
+              >
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${directMessagesExpanded ? '' : '-rotate-90'}`}
+                />
               </button>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${directMessagesExpanded ? '' : '-rotate-90'}`}
-              />
             </div>
-          </button>
+          </div>
 
           {directMessagesExpanded && (
             <div className="mt-1 space-y-0.5">
-              {directMessages.length === 0 ? (
-                <div className="px-2 py-1 text-sm text-purple-300">No direct messages</div>
+              {dmUsers.length === 0 ? (
+                <div className="px-2 py-1 text-sm text-purple-300">No users available</div>
               ) : (
-                directMessages.map((channel) => (
-                  <Link
-                    key={channel.id}
-                    href={`/channels/${channel.id}`}
-                    className={`flex items-center space-x-2 px-2 py-1 rounded text-sm hover:bg-purple-800 ${
-                      pathname === `/channels/${channel.id}` ? 'bg-purple-700' : ''
-                    }`}
-                  >
-                    <div className="w-4 h-4 rounded-full bg-green-500 flex-shrink-0"></div>
-                    <span className="flex-1 truncate">{channel.name}</span>
-                    {channel.unread_count && channel.unread_count > 0 ? (
-                      <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                        {channel.unread_count}
+                dmUsers.map((dmUser) => {
+                  // Check if we have an existing DM with this user
+                  const existingDM = directMessages.find((dm) =>
+                    dm.name.includes(dmUser.username)
+                  );
+                  const isActive = existingDM && pathname === `/channels/${existingDM.id}`;
+
+                  return (
+                    <button
+                      key={dmUser.id}
+                      onClick={() => handleSelectUser(dmUser)}
+                      className={`w-full flex items-center space-x-2 px-2 py-1 rounded text-sm hover:bg-purple-800 ${
+                        isActive ? 'bg-purple-700' : ''
+                      }`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          dmUser.status === 'ACTIVE'
+                            ? 'bg-green-500'
+                            : dmUser.status === 'INACTIVE'
+                            ? 'bg-gray-400'
+                            : 'bg-red-500'
+                        }`}
+                      ></div>
+                      <span className="flex-1 truncate text-left">
+                        {dmUser.display_name || dmUser.username}
                       </span>
-                    ) : null}
-                  </Link>
-                ))
+                      {existingDM?.unread_count && existingDM.unread_count > 0 ? (
+                        <span className="bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                          {existingDM.unread_count}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })
               )}
             </div>
           )}

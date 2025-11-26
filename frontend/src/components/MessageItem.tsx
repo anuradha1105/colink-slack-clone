@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Message } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Smile, MessageSquare, MoreVertical } from 'lucide-react';
+import { reactionsApi } from '@/lib/api';
 
 interface MessageItemProps {
   message: Message;
@@ -12,6 +14,53 @@ interface MessageItemProps {
 
 export function MessageItem({ message, showAvatar }: MessageItemProps) {
   const [showActions, setShowActions] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Common emojis for quick reactions
+  const quickEmojis = ['👍', '❤️', '😂', '🎉', '👀', '🔥'];
+
+  const addReactionMutation = useMutation({
+    mutationFn: async (emoji: string) => {
+      return await reactionsApi.post(`/messages/${message.id}/reactions`, { emoji });
+    },
+    onSuccess: () => {
+      // Invalidate messages query to refresh reactions
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      setShowEmojiPicker(false);
+    },
+    onError: (error: any) => {
+      console.error('Failed to add reaction:', error);
+      // If user already reacted, try to remove instead
+      if (error.response?.status === 400) {
+        console.log('User may have already reacted with this emoji');
+      }
+    },
+  });
+
+  const removeReactionMutation = useMutation({
+    mutationFn: async (emoji: string) => {
+      return await reactionsApi.delete(`/messages/${message.id}/reactions/${encodeURIComponent(emoji)}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+    },
+    onError: (error) => {
+      console.error('Failed to remove reaction:', error);
+    },
+  });
+
+  const handleReactionClick = (emoji: string) => {
+    addReactionMutation.mutate(emoji);
+  };
+
+  const handleEmojiClick = (emoji: string, userReacted: boolean) => {
+    if (userReacted) {
+      removeReactionMutation.mutate(emoji);
+    } else {
+      addReactionMutation.mutate(emoji);
+    }
+  };
 
   const formattedTime = formatDistanceToNow(new Date(message.created_at), {
     addSuffix: true,
@@ -35,6 +84,8 @@ export function MessageItem({ message, showAvatar }: MessageItemProps) {
             <span className="text-white font-medium">
               {message.author?.display_name?.[0]?.toUpperCase() ||
                 message.author?.username?.[0]?.toUpperCase() ||
+                message.author_display_name?.[0]?.toUpperCase() ||
+                message.author_username?.[0]?.toUpperCase() ||
                 'U'}
             </span>
           </div>
@@ -50,7 +101,11 @@ export function MessageItem({ message, showAvatar }: MessageItemProps) {
           {showAvatar && (
             <div className="flex items-baseline space-x-2 mb-1">
               <span className="font-semibold text-gray-900">
-                {message.author?.display_name || message.author?.username || 'Unknown User'}
+                {message.author?.display_name ||
+                 message.author?.username ||
+                 message.author_display_name ||
+                 message.author_username ||
+                 'Unknown User'}
               </span>
               <span className="text-xs text-gray-500">{formattedTime}</span>
               {message.is_edited && (
@@ -67,15 +122,41 @@ export function MessageItem({ message, showAvatar }: MessageItemProps) {
               {message.reactions.map((reaction) => (
                 <button
                   key={reaction.emoji}
-                  className="flex items-center space-x-1 px-2 py-1 bg-white border border-gray-300 rounded-full hover:border-blue-500 text-sm"
+                  onClick={() => handleEmojiClick(reaction.emoji, reaction.user_reacted)}
+                  className={`flex items-center space-x-1 px-2 py-1 border rounded-full text-sm transition-colors ${
+                    reaction.user_reacted
+                      ? 'bg-blue-100 border-blue-500 text-blue-700'
+                      : 'bg-white border-gray-300 hover:border-blue-500'
+                  }`}
+                  title={reaction.users?.map(u => u.username).join(', ')}
                 >
                   <span>{reaction.emoji}</span>
-                  <span className="text-gray-600">{reaction.count}</span>
+                  <span className={reaction.user_reacted ? 'text-blue-700' : 'text-gray-600'}>
+                    {reaction.count}
+                  </span>
                 </button>
               ))}
-              <button className="flex items-center px-2 py-1 bg-white border border-gray-300 rounded-full hover:border-blue-500">
+              <button
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="flex items-center px-2 py-1 bg-white border border-gray-300 rounded-full hover:border-blue-500"
+              >
                 <Smile className="h-4 w-4 text-gray-500" />
               </button>
+            </div>
+          )}
+
+          {/* Quick emoji picker */}
+          {showEmojiPicker && (
+            <div className="flex flex-wrap gap-1 mt-2 p-2 bg-white border border-gray-300 rounded shadow-lg">
+              {quickEmojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleReactionClick(emoji)}
+                  className="text-2xl hover:bg-gray-100 p-2 rounded transition-colors"
+                >
+                  {emoji}
+                </button>
+              ))}
             </div>
           )}
 
@@ -93,7 +174,11 @@ export function MessageItem({ message, showAvatar }: MessageItemProps) {
         {/* Hover actions */}
         {showActions && (
           <div className="flex items-center space-x-1 bg-white border border-gray-300 rounded shadow-sm px-2">
-            <button className="p-1 hover:bg-gray-100 rounded" title="Add reaction">
+            <button
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="p-1 hover:bg-gray-100 rounded"
+              title="Add reaction"
+            >
               <Smile className="h-4 w-4 text-gray-600" />
             </button>
             <button className="p-1 hover:bg-gray-100 rounded" title="Reply in thread">

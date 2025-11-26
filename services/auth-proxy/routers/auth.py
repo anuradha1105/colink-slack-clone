@@ -220,3 +220,48 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+
+
+@router.get("/users", response_model=list[UserInfo])
+async def get_all_users(
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(security),
+):
+    """Get all users.
+
+    This endpoint requires authentication and returns all users in the system.
+    """
+    try:
+        # Extract token from Authorization header
+        access_token = token.credentials
+
+        # Validate token with Keycloak
+        keycloak = KeycloakService()
+        await keycloak.get_user_info(access_token)
+
+        # Get all active users from database
+        stmt = select(User).where(User.status != UserStatus.DELETED)
+        result = await db.execute(stmt)
+        users = result.scalars().all()
+
+        return [
+            UserInfo(
+                id=str(user.id),
+                username=user.username,
+                email=user.email,
+                display_name=user.display_name,
+                avatar_url=user.avatar_url,
+                role=user.role,
+                status=user.status,
+            )
+            for user in users
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get users: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve users",
+        )
