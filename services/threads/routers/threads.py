@@ -10,7 +10,7 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from shared.database import Channel, Message, MessageType, Thread, User, get_db
+from shared.database import Channel, Message, MessageType, Reaction, Thread, User, get_db
 
 from ..dependencies import (
     get_current_user,
@@ -20,6 +20,7 @@ from ..dependencies import (
     verify_thread_access,
 )
 from ..schemas.threads import (
+    ReactionSummary,
     ThreadListResponse,
     ThreadParticipantResponse,
     ThreadParticipantsResponse,
@@ -36,6 +37,56 @@ router = APIRouter()
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
+
+async def get_reactions_for_messages(
+    message_ids: List[UUID],
+    current_user_id: UUID,
+    db: AsyncSession,
+) -> dict:
+    """Get reactions for multiple messages grouped by message_id and emoji."""
+    if not message_ids:
+        return {}
+
+    stmt = (
+        select(Reaction, User)
+        .join(User, Reaction.user_id == User.id)
+        .where(Reaction.message_id.in_(message_ids))
+    )
+    result = await db.execute(stmt)
+    reactions_with_users = result.all()
+
+    # Group by message_id and emoji
+    reactions_by_message = {}
+    for reaction, user in reactions_with_users:
+        message_id = str(reaction.message_id)
+        if message_id not in reactions_by_message:
+            reactions_by_message[message_id] = {}
+
+        emoji = reaction.emoji
+        if emoji not in reactions_by_message[message_id]:
+            reactions_by_message[message_id][emoji] = {
+                "emoji": emoji,
+                "count": 0,
+                "users": [],
+                "user_reacted": False,
+            }
+
+        reactions_by_message[message_id][emoji]["count"] += 1
+        reactions_by_message[message_id][emoji]["users"].append(
+            {"id": str(user.id), "username": user.username}
+        )
+        if reaction.user_id == current_user_id:
+            reactions_by_message[message_id][emoji]["user_reacted"] = True
+
+    # Convert to list format
+    result_dict = {}
+    for message_id, emojis in reactions_by_message.items():
+        result_dict[message_id] = [
+            ReactionSummary(**reaction_data) for reaction_data in emojis.values()
+        ]
+
+    return result_dict
 
 
 async def get_thread_with_details(
@@ -187,8 +238,15 @@ async def get_thread_replies(
     result = await db.execute(stmt)
     rows = result.all()
 
+    # Get reactions for all messages
+    message_ids = [message.id for message, _ in rows]
+    reactions_map = await get_reactions_for_messages(
+        message_ids, current_user.id, db
+    )
+
     replies = []
     for message, author in rows:
+        message_reactions = reactions_map.get(str(message.id), [])
         replies.append(
             ThreadReplyResponse(
                 id=message.id,
@@ -202,6 +260,7 @@ async def get_thread_replies(
                 created_at=message.created_at,
                 updated_at=message.updated_at,
                 edited_at=message.edited_at,
+                reactions=message_reactions,
             )
         )
 
@@ -287,8 +346,15 @@ async def get_message_replies(
     result = await db.execute(stmt)
     rows = result.all()
 
+    # Get reactions for all messages
+    message_ids = [message.id for message, _ in rows]
+    reactions_map = await get_reactions_for_messages(
+        message_ids, current_user.id, db
+    )
+
     replies = []
     for message, author in rows:
+        message_reactions = reactions_map.get(str(message.id), [])
         replies.append(
             ThreadReplyResponse(
                 id=message.id,
@@ -302,6 +368,7 @@ async def get_message_replies(
                 created_at=message.created_at,
                 updated_at=message.updated_at,
                 edited_at=message.edited_at,
+                reactions=message_reactions,
             )
         )
 

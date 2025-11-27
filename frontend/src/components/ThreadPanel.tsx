@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Send } from 'lucide-react';
 import { messageApi, threadsApi } from '@/lib/api';
-import { Message } from '@/types';
+import { Message, ReactionSummary } from '@/types';
 import { MessageItem } from './MessageItem';
 import { useWebSocket } from '@/contexts/WebSocketContext';
+import { useAuthStore } from '@/store/authStore';
 
 interface ThreadPanelProps {
   message: Message;
@@ -24,12 +25,15 @@ interface ThreadReply {
   is_edited: boolean;
   created_at: string;
   updated_at: string;
+  reactions?: ReactionSummary[];
 }
 
 export function ThreadPanel({ message, onClose }: ThreadPanelProps) {
   const [replyContent, setReplyContent] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const { onNewMessage } = useWebSocket();
+  const { onNewMessage, onReactionAdded, onReactionRemoved } = useWebSocket();
+  const queryClient = useQueryClient();
+  const { user: currentUser } = useAuthStore();
 
   // Fetch thread replies using parent message ID
   const { data: threadData, isLoading, refetch } = useQuery({
@@ -60,6 +64,104 @@ export function ThreadPanel({ message, onClose }: ThreadPanelProps) {
 
     return unsubscribe;
   }, [message.id, message.thread_id, onNewMessage, refetch]);
+
+  // Listen for reaction added in thread
+  useEffect(() => {
+    const unsubscribe = onReactionAdded((data) => {
+      // Update thread replies cache
+      queryClient.setQueryData<{ replies: ThreadReply[]; total_count: number; has_more: boolean }>(
+        ['message-replies', message.id],
+        (old) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+            replies: old.replies.map(reply => {
+              if (reply.id === data.message_id) {
+                const reactions = reply.reactions || [];
+                const existingReaction = reactions.find(r => r.emoji === data.emoji);
+
+                if (existingReaction) {
+                  // Increment count and add user
+                  return {
+                    ...reply,
+                    reactions: reactions.map(r =>
+                      r.emoji === data.emoji
+                        ? {
+                            ...r,
+                            count: r.count + 1,
+                            users: [...r.users, { id: data.user_id, username: data.username }],
+                            user_reacted: data.user_id === currentUser?.id ? true : r.user_reacted,
+                          }
+                        : r
+                    ),
+                  };
+                } else {
+                  // Add new reaction
+                  return {
+                    ...reply,
+                    reactions: [
+                      ...reactions,
+                      {
+                        emoji: data.emoji,
+                        count: 1,
+                        users: [{ id: data.user_id, username: data.username }],
+                        user_reacted: data.user_id === currentUser?.id,
+                      },
+                    ],
+                  };
+                }
+              }
+              return reply;
+            }),
+          };
+        }
+      );
+    });
+
+    return unsubscribe;
+  }, [message.id, onReactionAdded, queryClient, currentUser?.id]);
+
+  // Listen for reaction removed in thread
+  useEffect(() => {
+    const unsubscribe = onReactionRemoved((data) => {
+      // Update thread replies cache
+      queryClient.setQueryData<{ replies: ThreadReply[]; total_count: number; has_more: boolean }>(
+        ['message-replies', message.id],
+        (old) => {
+          if (!old) return old;
+
+          return {
+            ...old,
+            replies: old.replies.map(reply => {
+              if (reply.id === data.message_id) {
+                const reactions = reply.reactions || [];
+                return {
+                  ...reply,
+                  reactions: reactions
+                    .map(r => {
+                      if (r.emoji === data.emoji) {
+                        return {
+                          ...r,
+                          count: r.count - 1,
+                          users: r.users.filter(u => u.id !== data.user_id),
+                          user_reacted: data.user_id === currentUser?.id ? false : r.user_reacted,
+                        };
+                      }
+                      return r;
+                    })
+                    .filter(r => r.count > 0), // Remove reactions with 0 count
+                };
+              }
+              return reply;
+            }),
+          };
+        }
+      );
+    });
+
+    return unsubscribe;
+  }, [message.id, onReactionRemoved, queryClient, currentUser?.id]);
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +229,7 @@ export function ThreadPanel({ message, onClose }: ThreadPanelProps) {
               is_edited: reply.is_edited,
               created_at: reply.created_at,
               updated_at: reply.updated_at,
+              reactions: reply.reactions || [],
             };
 
             return (

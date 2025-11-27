@@ -161,23 +161,95 @@ export default function ChannelPage({ params }: ChannelPageProps) {
 
   // Listen for reaction added
   useEffect(() => {
-    const unsubscribe = onReactionAdded(() => {
-      // Simply invalidate the messages query to refetch and get updated reactions
-      queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+    const unsubscribe = onReactionAdded((data) => {
+      if (data.channel_id === channelId) {
+        // Update main messages
+        queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
+          return old.map(msg => {
+            if (msg.id === data.message_id) {
+              const reactions = msg.reactions || [];
+              const existingReaction = reactions.find(r => r.emoji === data.emoji);
+
+              if (existingReaction) {
+                // Increment count and add user
+                return {
+                  ...msg,
+                  reactions: reactions.map(r =>
+                    r.emoji === data.emoji
+                      ? {
+                          ...r,
+                          count: r.count + 1,
+                          users: [...r.users, { id: data.user_id, username: data.username }],
+                          user_reacted: data.user_id === currentUser?.id ? true : r.user_reacted,
+                        }
+                      : r
+                  ),
+                };
+              } else {
+                // Add new reaction
+                return {
+                  ...msg,
+                  reactions: [
+                    ...reactions,
+                    {
+                      emoji: data.emoji,
+                      count: 1,
+                      users: [{ id: data.user_id, username: data.username }],
+                      user_reacted: data.user_id === currentUser?.id,
+                    },
+                  ],
+                };
+              }
+            }
+            return msg;
+          });
+        });
+
+        // Also invalidate thread replies in case this message is in a thread
+        queryClient.invalidateQueries({ queryKey: ['message-replies'] });
+      }
     });
 
     return unsubscribe;
-  }, [channelId, onReactionAdded, queryClient]);
+  }, [channelId, onReactionAdded, queryClient, currentUser?.id]);
 
   // Listen for reaction removed
   useEffect(() => {
-    const unsubscribe = onReactionRemoved(() => {
-      // Simply invalidate the messages query to refetch and get updated reactions
-      queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+    const unsubscribe = onReactionRemoved((data) => {
+      if (data.channel_id === channelId) {
+        // Update main messages
+        queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
+          return old.map(msg => {
+            if (msg.id === data.message_id) {
+              const reactions = msg.reactions || [];
+              return {
+                ...msg,
+                reactions: reactions
+                  .map(r => {
+                    if (r.emoji === data.emoji) {
+                      return {
+                        ...r,
+                        count: r.count - 1,
+                        users: r.users.filter(u => u.id !== data.user_id),
+                        user_reacted: data.user_id === currentUser?.id ? false : r.user_reacted,
+                      };
+                    }
+                    return r;
+                  })
+                  .filter(r => r.count > 0), // Remove reactions with 0 count
+              };
+            }
+            return msg;
+          });
+        });
+
+        // Also invalidate thread replies in case this message is in a thread
+        queryClient.invalidateQueries({ queryKey: ['message-replies'] });
+      }
     });
 
     return unsubscribe;
-  }, [channelId, onReactionRemoved, queryClient]);
+  }, [channelId, onReactionRemoved, queryClient, currentUser?.id]);
 
   if (channelLoading) {
     return (

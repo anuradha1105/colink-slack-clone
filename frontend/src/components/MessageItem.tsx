@@ -28,6 +28,8 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
     onSuccess: () => {
       // Invalidate messages query to refresh reactions
       queryClient.invalidateQueries({ queryKey: ['messages'] });
+      // Also invalidate thread replies in case this message is in a thread
+      queryClient.invalidateQueries({ queryKey: ['message-replies'] });
       setShowEmojiPicker(false);
     },
     onError: (error: any) => {
@@ -45,6 +47,8 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages'] });
+      // Also invalidate thread replies in case this message is in a thread
+      queryClient.invalidateQueries({ queryKey: ['message-replies'] });
     },
     onError: (error) => {
       console.error('Failed to remove reaction:', error);

@@ -1,10 +1,23 @@
 """Pydantic schemas for Thread service."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+
+# ============================================================================
+# Reaction Schemas
+# ============================================================================
+
+
+class ReactionSummary(BaseModel):
+    """Summary of reactions for a message."""
+    emoji: str
+    count: int
+    users: List[Dict[str, Any]]  # List of {id, username}
+    user_reacted: bool = False
 
 
 # ============================================================================
@@ -60,6 +73,7 @@ class ThreadReplyResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     edited_at: Optional[datetime] = None
+    reactions: List[ReactionSummary] = []
 
     class Config:
         from_attributes = True
