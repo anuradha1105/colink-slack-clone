@@ -57,7 +57,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
           }));
           // Reverse to show oldest first (messages come from API in desc order)
           const reversed = messagesWithAuthor.reverse();
-          console.log(`[MESSAGES QUERY] Returning ${reversed.length} messages (reversed):`, reversed.map(m => ({ id: m.id, content: m.content.substring(0, 20) })));
+          console.log(`[MESSAGES QUERY] Returning ${reversed.length} messages (reversed):`, reversed.map(m => ({ id: m.id, content: m.content.substring(0, 20), reply_count: m.reply_count })));
           return reversed;
         }
         console.log('[MESSAGES QUERY] No messages array in response, returning empty array');
@@ -93,6 +93,19 @@ export default function ChannelPage({ params }: ChannelPageProps) {
               return old;
             }
             return [...old, newMessage];
+          });
+        } else if (newMessage.parent_message_id) {
+          // This is a thread reply - increment the reply count of the parent message
+          queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
+            return old.map(msg => {
+              if (msg.id === newMessage.parent_message_id) {
+                return {
+                  ...msg,
+                  reply_count: (msg.reply_count || 0) + 1,
+                };
+              }
+              return msg;
+            });
           });
         }
       }

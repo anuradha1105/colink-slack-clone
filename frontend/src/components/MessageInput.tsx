@@ -12,9 +12,13 @@ interface MessageInputProps {
 
 export function MessageInput({ channelId }: MessageInputProps) {
   const [content, setContent] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const queryClient = useQueryClient();
   const { sendTyping } = useWebSocket();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Common emojis for quick access
+  const quickEmojis = ['😊', '👍', '❤️', '😂', '🎉', '👀', '🔥', '✅', '🚀', '💯'];
 
   const sendMessageMutation = useMutation({
     mutationFn: async (messageContent: string) => {
@@ -86,6 +90,11 @@ export function MessageInput({ channelId }: MessageInputProps) {
     }
   };
 
+  const handleEmojiClick = (emoji: string) => {
+    setContent(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
   return (
     <div className="border-t border-gray-200 bg-white px-4 py-4">
       <form onSubmit={handleSubmit}>
@@ -101,7 +110,7 @@ export function MessageInput({ channelId }: MessageInputProps) {
               disabled={sendMessageMutation.isPending}
             />
             <div className="flex items-center justify-between px-4 pb-3 pt-1">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 relative">
                 <button
                   type="button"
                   className="p-1 hover:bg-gray-100 rounded"
@@ -113,9 +122,35 @@ export function MessageInput({ channelId }: MessageInputProps) {
                   type="button"
                   className="p-1 hover:bg-gray-100 rounded"
                   title="Add emoji"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 >
                   <Smile className="h-5 w-5 text-gray-600" />
                 </button>
+
+                {/* Emoji Picker */}
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 p-2 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+                    <div className="flex items-center gap-1">
+                      {quickEmojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleEmojiClick(emoji)}
+                          className="text-2xl hover:bg-gray-100 p-1 rounded transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(false)}
+                        className="ml-2 text-gray-400 hover:text-gray-600 text-sm px-2"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 type="submit"

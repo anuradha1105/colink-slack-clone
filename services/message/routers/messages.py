@@ -16,6 +16,7 @@ from shared.database import (
     Message,
     MessageType,
     Reaction,
+    Thread,
     User,
     UserRole,
     get_db,
@@ -81,6 +82,29 @@ async def get_reactions_for_messages(
         result_dict[message_id] = list(emojis.values())
 
     return result_dict
+
+
+async def get_reply_counts_for_messages(
+    message_ids: List[UUID],
+    db: AsyncSession
+) -> dict:
+    """Get reply counts for multiple messages from Thread table."""
+    if not message_ids:
+        return {}
+
+    stmt = (
+        select(Thread.root_message_id, Thread.reply_count)
+        .where(Thread.root_message_id.in_(message_ids))
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    # Map message_id to reply_count
+    reply_counts = {}
+    for root_message_id, reply_count in rows:
+        reply_counts[str(root_message_id)] = reply_count
+
+    return reply_counts
 
 
 # ============================================================================
@@ -394,11 +418,18 @@ async def get_channel_messages(
     message_ids = [message.id for message in messages]
     reactions_by_message = await get_reactions_for_messages(message_ids, current_user.id, db)
 
+    # Fetch reply counts for all messages
+    reply_counts_by_message = await get_reply_counts_for_messages(message_ids, db)
+    logger.info(f"[REPLY COUNT] Fetched reply counts for {len(message_ids)} messages: {reply_counts_by_message}")
+
     # Build response
     message_responses = []
     for message in messages:
         message_id_str = str(message.id)
         reactions = reactions_by_message.get(message_id_str, [])
+        reply_count = reply_counts_by_message.get(message_id_str, 0)
+        if reply_count > 0:
+            logger.info(f"[REPLY COUNT] Message {message_id_str} has {reply_count} replies")
 
         message_responses.append(
             MessageResponse(
@@ -417,6 +448,7 @@ async def get_channel_messages(
                 author_username=message.author.username if message.author else None,
                 author_display_name=message.author.display_name if message.author else None,
                 reactions=reactions if reactions else None,
+                reply_count=reply_count if reply_count > 0 else None,
             )
         )
 
