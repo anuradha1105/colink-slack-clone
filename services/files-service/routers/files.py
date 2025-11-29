@@ -181,7 +181,7 @@ async def download_file(
 
     # Download from MinIO
     try:
-        file_data = minio_service.download_file(file_record.storage_key)
+        file_data, content_type = minio_service.download_file(file_record.storage_key)
     except Exception as e:
         logger.error(f"Error downloading file {file_id}: {e}")
         raise HTTPException(
@@ -194,7 +194,7 @@ async def download_file(
 
     return StreamingResponse(
         BytesIO(file_data),
-        media_type=file_record.mime_type,
+        media_type=file_record.mime_type or content_type,
         headers={
             "Content-Disposition": f'attachment; filename="{file_record.original_filename}"',
         },

@@ -13,16 +13,25 @@ from shared.database import User, get_db
 logger = logging.getLogger(__name__)
 
 
-async def get_current_user_id(request: Request) -> Optional[UUID]:
+async def get_current_user_id(request: Request) -> UUID:
     """Get current user ID from request state (set by auth middleware).
 
     Args:
         request: FastAPI request object
 
     Returns:
-        User ID if authenticated, None otherwise
+        User ID
+
+    Raises:
+        HTTPException: If user is not authenticated
     """
-    return getattr(request.state, "user_id", None)
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    return user_id
 
 
 async def get_current_user(
@@ -49,8 +58,8 @@ async def get_current_user(
             detail="Not authenticated",
         )
 
-    # Get user from database
-    stmt = select(User).where(User.id == user_id)
+    # Get user from database (user_id from JWT is actually keycloak_id)
+    stmt = select(User).where(User.keycloak_id == str(user_id))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 

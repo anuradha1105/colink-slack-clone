@@ -37,6 +37,7 @@ export interface Message {
   updated_at: string;
   reply_count?: number;
   reactions?: ReactionSummary[];
+  attachments?: FileUpload[];
 }
 
 export interface Thread {

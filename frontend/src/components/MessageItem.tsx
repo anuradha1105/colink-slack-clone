@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Message } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
-import { Smile, MessageSquare, MoreVertical } from 'lucide-react';
-import { messageApi } from '@/lib/api';
+import { Smile, MessageSquare, MoreVertical, File, Download, FileText, FileImage, FileVideo } from 'lucide-react';
+import { messageApi, filesApi } from '@/lib/api';
+import { AuthService } from '@/lib/auth';
 
 interface MessageItemProps {
   message: Message;
@@ -77,6 +78,65 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
     hour12: true,
   });
 
+  const handleDownloadFile = async (fileId: string, filename: string) => {
+    try {
+      // Get access token from AuthService
+      const tokens = AuthService.getTokens();
+      console.log('[Download] Starting download for file:', fileId, filename);
+      console.log('[Download] Token available:', !!tokens?.access_token);
+
+      if (!tokens?.access_token) {
+        console.error('[Download] No access token available');
+        alert('Authentication required. Please refresh the page and try again.');
+        return;
+      }
+
+      // Use filesApi to get the file with authentication
+      const downloadUrl = `http://localhost:8007/api/v1/files/${fileId}/download`;
+      console.log('[Download] Fetching from:', downloadUrl);
+
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${tokens.access_token}`,
+        },
+      });
+
+      console.log('[Download] Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error('[Download] 401 Unauthorized - token may be expired');
+          alert('Your session has expired. Please refresh the page and try again.');
+        } else {
+          console.error('[Download] Download failed with status:', response.status);
+          alert(`Download failed: ${response.statusText}`);
+        }
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+      console.log('[Download] Blob received, size:', blob.size);
+
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary link and click it to trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      console.log('[Download] Download completed successfully');
+    } catch (error) {
+      console.error('[Download] Error downloading file:', error);
+    }
+  };
+
   return (
     <div
       className="group hover:bg-gray-100 px-4 py-1 rounded"
@@ -120,6 +180,45 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
           )}
 
           <div className="text-gray-900 break-words">{message.content}</div>
+
+          {/* Attachments */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {message.attachments.map((file) => {
+                const isImage = file.mime_type?.startsWith('image/');
+                const isVideo = file.mime_type?.startsWith('video/');
+                const FileIcon = isImage ? FileImage : isVideo ? FileVideo : FileText;
+
+                return (
+                  <div
+                    key={file.id}
+                    className="border border-gray-300 rounded-lg p-3 bg-white hover:bg-gray-50 transition-colors max-w-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <FileIcon className="h-8 w-8 text-gray-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {file.original_filename}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(file.size_bytes / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDownloadFile(file.id, file.original_filename)}
+                        className="ml-3 p-2 hover:bg-gray-200 rounded transition-colors"
+                        title="Download"
+                      >
+                        <Download className="h-5 w-5 text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Reactions */}
           {(message.reactions && message.reactions.length > 0) || showEmojiPicker ? (

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .middleware import AuthMiddleware
+from .middleware.auth_jwt import AuthMiddleware
 from .routers import files_router, health_router
 from .services.kafka_producer import kafka_producer
 from .services.minio_service import minio_service

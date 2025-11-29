@@ -13,7 +13,9 @@ from sqlalchemy.orm import selectinload
 
 from shared.database import (
     Channel,
+    File,
     Message,
+    MessageAttachment,
     MessageType,
     Reaction,
     Thread,
@@ -119,6 +121,7 @@ class MessageCreate(BaseModel):
     channel_id: UUID = Field(..., description="Channel ID where message will be sent")
     parent_id: Optional[UUID] = Field(None, description="Parent message ID for threads")
     message_type: MessageType = Field(MessageType.TEXT, description="Message type")
+    attachment_ids: Optional[List[UUID]] = Field(None, description="List of file IDs to attach to message")
 
 
 class MessageUpdate(BaseModel):
@@ -133,6 +136,20 @@ class ReactionSummary(BaseModel):
     count: int
     users: List[dict]  # List of {id, username}
     user_reacted: bool = False
+
+
+class FileAttachment(BaseModel):
+    """File attachment information."""
+
+    id: UUID
+    original_filename: str
+    file_url: str
+    thumbnail_url: Optional[str] = None
+    size_bytes: int
+    mime_type: str
+
+    class Config:
+        from_attributes = True
 
 
 class MessageResponse(BaseModel):
@@ -161,6 +178,9 @@ class MessageResponse(BaseModel):
     # Reactions
     reactions: Optional[List[ReactionSummary]] = None
     reply_count: Optional[int] = None
+
+    # Attachments
+    attachments: Optional[List[FileAttachment]] = None
 
     class Config:
         from_attributes = True
@@ -238,6 +258,27 @@ async def create_message(
     )
 
     db.add(message)
+    await db.flush()  # Flush to get message.id before creating attachments
+
+    # Handle file attachments
+    if message_data.attachment_ids:
+        for file_id in message_data.attachment_ids:
+            # Verify file exists
+            file_stmt = select(File).where(File.id == file_id)
+            file_result = await db.execute(file_stmt)
+            file = file_result.scalar_one_or_none()
+
+            if not file:
+                logger.warning(f"File {file_id} not found, skipping attachment")
+                continue
+
+            # Create message attachment
+            msg_attachment = MessageAttachment(
+                message_id=message.id,
+                file_id=file_id
+            )
+            db.add(msg_attachment)
+
     await db.commit()
     await db.refresh(message)
 
@@ -259,21 +300,64 @@ async def create_message(
         result = await db.execute(stmt)
         parent_message_id = result.scalar_one_or_none()
 
-    # Publish event to Kafka
+    # Load attachments for the message
+    stmt = (
+        select(Message)
+        .options(
+            selectinload(Message.attachments).selectinload(MessageAttachment.file)
+        )
+        .where(Message.id == message.id)
+    )
+    result = await db.execute(stmt)
+    message_with_attachments = result.scalar_one()
+
+    # Build attachments list for response and Kafka
+    attachments = []
+    attachments_for_kafka = []
+    if message_with_attachments.attachments:
+        for msg_attachment in message_with_attachments.attachments:
+            if msg_attachment.file:
+                attachments.append(
+                    FileAttachment(
+                        id=msg_attachment.file.id,
+                        original_filename=msg_attachment.file.original_filename,
+                        file_url=msg_attachment.file.url or "",
+                        thumbnail_url=msg_attachment.file.thumbnail_url,
+                        size_bytes=msg_attachment.file.size_bytes,
+                        mime_type=msg_attachment.file.mime_type,
+                    )
+                )
+                # Build attachment data for Kafka event
+                attachments_for_kafka.append({
+                    "id": str(msg_attachment.file.id),
+                    "original_filename": msg_attachment.file.original_filename,
+                    "file_url": msg_attachment.file.url or "",
+                    "thumbnail_url": msg_attachment.file.thumbnail_url,
+                    "size_bytes": msg_attachment.file.size_bytes,
+                    "mime_type": msg_attachment.file.mime_type,
+                })
+
+    # Publish event to Kafka with attachments
+    kafka_message_data = {
+        "id": str(message.id),
+        "content": message.content,
+        "channel_id": str(message.channel_id),
+        "author_id": str(message.author_id),
+        "thread_id": str(message.thread_id) if message.thread_id else None,
+        "parent_message_id": str(parent_message_id) if parent_message_id else None,
+        "message_type": message.message_type.value,
+        "created_at": message.created_at.isoformat(),
+        "author_username": current_user.username,
+        "author_display_name": current_user.display_name,
+    }
+
+    # Only add attachments if there are any
+    if attachments_for_kafka:
+        kafka_message_data["attachments"] = attachments_for_kafka
+
     await kafka_producer.publish_message_event(
         event_type="message.created",
-        message_data={
-            "id": str(message.id),
-            "content": message.content,
-            "channel_id": str(message.channel_id),
-            "author_id": str(message.author_id),
-            "thread_id": str(message.thread_id) if message.thread_id else None,
-            "parent_message_id": str(parent_message_id) if parent_message_id else None,
-            "message_type": message.message_type.value,
-            "created_at": message.created_at.isoformat(),
-            "author_username": current_user.username,
-            "author_display_name": current_user.display_name,
-        },
+        message_data=kafka_message_data,
         key=str(message_data.channel_id),
     )
 
@@ -294,6 +378,7 @@ async def create_message(
         deleted_at=message.deleted_at,
         author_username=current_user.username,
         author_display_name=current_user.display_name,
+        attachments=attachments if attachments else None,
     )
 
     return response
@@ -376,7 +461,10 @@ async def get_channel_messages(
     # Build query
     stmt = (
         select(Message)
-        .options(selectinload(Message.author))
+        .options(
+            selectinload(Message.author),
+            selectinload(Message.attachments).selectinload(MessageAttachment.file)
+        )
         .where(
             Message.channel_id == channel_id,
             Message.thread_id.is_(None),  # Only top-level messages (not thread replies)
@@ -431,6 +519,22 @@ async def get_channel_messages(
         if reply_count > 0:
             logger.info(f"[REPLY COUNT] Message {message_id_str} has {reply_count} replies")
 
+        # Build attachments list
+        attachments = []
+        if message.attachments:
+            for msg_attachment in message.attachments:
+                if msg_attachment.file:
+                    attachments.append(
+                        FileAttachment(
+                            id=msg_attachment.file.id,
+                            original_filename=msg_attachment.file.original_filename,
+                            file_url=msg_attachment.file.url or "",
+                            thumbnail_url=msg_attachment.file.thumbnail_url,
+                            size_bytes=msg_attachment.file.size_bytes,
+                            mime_type=msg_attachment.file.mime_type,
+                        )
+                    )
+
         message_responses.append(
             MessageResponse(
                 id=message.id,
@@ -449,6 +553,7 @@ async def get_channel_messages(
                 author_display_name=message.author.display_name if message.author else None,
                 reactions=reactions if reactions else None,
                 reply_count=reply_count if reply_count > 0 else None,
+                attachments=attachments if attachments else None,
             )
         )
 
