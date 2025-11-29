@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Message } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
-import { Smile, MessageSquare, MoreVertical, File, Download, FileText, FileImage, FileVideo } from 'lucide-react';
+import { Smile, MessageSquare, MoreVertical, File, Download, FileText, FileImage, FileVideo, Trash2 } from 'lucide-react';
 import { messageApi, filesApi } from '@/lib/api';
 import { AuthService } from '@/lib/auth';
+import { useAuthStore } from '@/store/authStore';
 
 interface MessageItemProps {
   message: Message;
@@ -18,9 +19,13 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   // Common emojis for quick reactions
   const quickEmojis = ['👍', '❤️', '😂', '🎉', '👀', '🔥'];
+
+  // Check if current user can delete this message
+  const canDelete = user?.id === message.author_id || user?.id === message.author?.id;
 
   const addReactionMutation = useMutation({
     mutationFn: async (emoji: string) => {
@@ -56,6 +61,22 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
     },
   });
 
+  const deleteMessageMutation = useMutation({
+    mutationFn: async () => {
+      return await messageApi.delete(`/messages/${message.id}`);
+    },
+    onSuccess: () => {
+      // Invalidate messages query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      // Also invalidate thread replies in case this message is in a thread
+      queryClient.invalidateQueries({ queryKey: ['message-replies'] });
+    },
+    onError: (error) => {
+      console.error('Failed to delete message:', error);
+      alert('Failed to delete message. Please try again.');
+    },
+  });
+
   const handleReactionClick = (emoji: string) => {
     addReactionMutation.mutate(emoji);
   };
@@ -65,6 +86,12 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
       removeReactionMutation.mutate(emoji);
     } else {
       addReactionMutation.mutate(emoji);
+    }
+  };
+
+  const handleDeleteMessage = () => {
+    if (confirm('Are you sure you want to delete this message?')) {
+      deleteMessageMutation.mutate();
     }
   };
 
@@ -302,9 +329,16 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
             >
               <MessageSquare className="h-4 w-4 text-gray-600" />
             </button>
-            <button className="p-1 hover:bg-gray-100 rounded" title="More actions">
-              <MoreVertical className="h-4 w-4 text-gray-600" />
-            </button>
+            {canDelete && (
+              <button
+                onClick={handleDeleteMessage}
+                className="p-1 hover:bg-red-100 rounded"
+                title="Delete message"
+                disabled={deleteMessageMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </button>
+            )}
           </div>
         )}
       </div>

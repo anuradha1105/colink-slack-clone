@@ -103,9 +103,10 @@ async def handle_kafka_message(data: dict):
             )
 
         elif event_type == "message.deleted":
-            message_id = data.get("message_id")
-            channel_id = data.get("channel_id")
+            message_id = message_data.get("id")
+            channel_id = message_data.get("channel_id")
             if channel_id:
+                logger.info(f"📤 Broadcasting message deletion to channel: {channel_id}")
                 await sio.emit(
                     "message_deleted",
                     {"message_id": message_id},
