@@ -9,6 +9,7 @@ import { Channel, User } from '@/types';
 import { Hash, Lock, ChevronDown, Plus, MessageSquare, Settings, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { CreateChannelModal } from './CreateChannelModal';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -17,6 +18,7 @@ export function Sidebar() {
   const { user, logout } = useAuthStore();
   const [channelsExpanded, setChannelsExpanded] = useState(true);
   const [directMessagesExpanded, setDirectMessagesExpanded] = useState(true);
+  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
 
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ['channels'],
@@ -132,7 +134,7 @@ export function Sidebar() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // TODO: Handle create channel
+                  setShowCreateChannelModal(true);
                 }}
                 className="hover:bg-purple-700 rounded p-0.5"
               >
@@ -281,6 +283,15 @@ export function Sidebar() {
           <span>Sign out</span>
         </button>
       </div>
+
+      {/* Create Channel Modal */}
+      <CreateChannelModal
+        isOpen={showCreateChannelModal}
+        onClose={() => setShowCreateChannelModal(false)}
+        onSuccess={(channel) => {
+          router.push(`/channels/${channel.id}`);
+        }}
+      />
     </div>
   );
 }
