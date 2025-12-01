@@ -47,14 +47,17 @@ interface WebSocketProviderProps {
 export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { tokens, isAuthenticated } = useAuthStore();
+  const tokens = useAuthStore((state) => state.tokens);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const socketRef = useRef<Socket | null>(null);
+  const joinedChannelsRef = useRef<Set<string>>(new Set());
 
   // Initialize WebSocket connection
   useEffect(() => {
     if (!isAuthenticated || !tokens?.access_token) {
       // Disconnect if not authenticated
       if (socketRef.current) {
+        console.log('📡 Disconnecting WebSocket - not authenticated');
         socketRef.current.disconnect();
         socketRef.current = null;
         setSocket(null);
@@ -62,6 +65,14 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       }
       return;
     }
+
+    // Prevent duplicate connections
+    if (socketRef.current) {
+      console.log('🔄 WebSocket already connected');
+      return;
+    }
+
+    console.log('🚀 Connecting to WebSocket:', config.websocket.url);
 
     // Create socket connection
     const newSocket = io(config.websocket.url, {
@@ -84,6 +95,8 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     newSocket.on('disconnect', (reason) => {
       console.log('📡 WebSocket disconnected:', reason);
       setIsConnected(false);
+      // Clear joined channels on disconnect
+      joinedChannelsRef.current.clear();
     });
 
     newSocket.on('connect_error', (error) => {
@@ -108,11 +121,17 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     };
   }, [isAuthenticated, tokens?.access_token]);
 
-  // Join a channel
+  // Join a channel (with deduplication)
   const joinChannel = useCallback((channelId: string) => {
     if (socketRef.current?.connected) {
-      socketRef.current.emit('join_channel', { channel_id: channelId });
-      console.log('Joined channel:', channelId);
+      // Only join if not already joined
+      if (!joinedChannelsRef.current.has(channelId)) {
+        socketRef.current.emit('join_channel', { channel_id: channelId });
+        joinedChannelsRef.current.add(channelId);
+        console.log('Joined channel:', channelId);
+      } else {
+        console.log('Already joined channel:', channelId);
+      }
     }
   }, []);
 
@@ -120,6 +139,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const leaveChannel = useCallback((channelId: string) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit('leave_channel', { channel_id: channelId });
+      joinedChannelsRef.current.delete(channelId);
       console.log('Left channel:', channelId);
     }
   }, []);

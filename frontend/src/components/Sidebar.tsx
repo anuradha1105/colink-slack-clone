@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { channelApi, authApi } from '@/lib/api';
 import { Channel, User } from '@/types';
-import { Hash, Lock, ChevronDown, Plus, MessageSquare, Settings, LogOut } from 'lucide-react';
+import { Hash, Lock, ChevronDown, Plus, MessageSquare, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { CreateChannelModal } from './CreateChannelModal';
@@ -25,7 +25,11 @@ export function Sidebar() {
     queryFn: async () => {
       try {
         const response = await channelApi.get<{ channels: Channel[] }>('/channels');
-        console.log('Channels response:', response);
+        console.log('📋 Channels response:', response);
+        console.log('📋 DM channels:', response?.channels?.filter((c: any) => c.channel_type === 'DIRECT').map((c: any) => ({
+          name: c.name,
+          unread: c.unread_count
+        })));
         // Extract channels array from response object
         const channelsData = response?.channels || [];
         return Array.isArray(channelsData) ? channelsData : [];
@@ -34,6 +38,9 @@ export function Sidebar() {
         return [];
       }
     },
+    // Poll for updates every 3 seconds to keep unread counts fresh
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true, // Continue polling even when tab is not focused
   });
 
   // Fetch all users for Direct Messages list
@@ -51,6 +58,9 @@ export function Sidebar() {
       }
     },
   });
+
+  // Note: Real-time notifications are disabled for now
+  // Using polling (refetchInterval: 3000) to refresh unread counts instead
 
   const publicChannels = channels.filter(c => c.channel_type === 'PUBLIC');
   const privateChannels = channels.filter(c => c.channel_type === 'PRIVATE');
@@ -234,8 +244,9 @@ export function Sidebar() {
               ) : (
                 dmUsers.map((dmUser) => {
                   // Check if we have an existing DM with this user
+                  // DM channel names are in format: dm_<user1_id>_<user2_id>
                   const existingDM = directMessages.find((dm) =>
-                    dm.name.includes(dmUser.username)
+                    dm.name.includes(dmUser.id)
                   );
                   const isActive = existingDM && pathname === `/channels/${existingDM.id}`;
 
