@@ -30,6 +30,7 @@ export interface Message {
   author?: User;
   author_username?: string;
   author_display_name?: string;
+  author_avatar_url?: string;
   content: string;
   thread_id?: string;
   parent_message_id?: string;

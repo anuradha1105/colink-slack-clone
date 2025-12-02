@@ -171,6 +171,7 @@ class MessageResponse(BaseModel):
     # Include author information
     author_username: Optional[str] = None
     author_display_name: Optional[str] = None
+    author_avatar_url: Optional[str] = None
 
     # Thread information (if reply)
     parent_message_id: Optional[UUID] = None  # For API compatibility
@@ -434,6 +435,7 @@ async def get_message(
         deleted_at=message.deleted_at,
         author_username=message.author.username if message.author else None,
         author_display_name=message.author.display_name if message.author else None,
+        author_avatar_url=message.author.avatar_url if message.author else None,
     )
 
     return response
@@ -551,6 +553,7 @@ async def get_channel_messages(
                 deleted_at=message.deleted_at,
                 author_username=message.author.username if message.author else None,
                 author_display_name=message.author.display_name if message.author else None,
+                author_avatar_url=message.author.avatar_url if message.author else None,
                 reactions=reactions if reactions else None,
                 reply_count=reply_count if reply_count > 0 else None,
                 attachments=attachments if attachments else None,
@@ -645,6 +648,7 @@ async def update_message(
         deleted_at=message.deleted_at,
         author_username=message.author.username if message.author else None,
         author_display_name=message.author.display_name if message.author else None,
+        author_avatar_url=message.author.avatar_url if message.author else None,
     )
 
     return response

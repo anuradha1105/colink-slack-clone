@@ -172,14 +172,22 @@ export function MessageItem({ message, showAvatar, onReplyClick }: MessageItemPr
     >
       <div className="flex space-x-3">
         {showAvatar ? (
-          <div className="w-10 h-10 rounded bg-blue-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-medium">
-              {message.author?.display_name?.[0]?.toUpperCase() ||
-                message.author?.username?.[0]?.toUpperCase() ||
-                message.author_display_name?.[0]?.toUpperCase() ||
-                message.author_username?.[0]?.toUpperCase() ||
-                'U'}
-            </span>
+          <div className="w-10 h-10 rounded bg-blue-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {(message.author?.avatar_url || message.author_avatar_url) ? (
+              <img
+                src={message.author?.avatar_url || message.author_avatar_url}
+                alt={message.author?.display_name || message.author?.username || 'User'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-white font-medium">
+                {message.author?.display_name?.[0]?.toUpperCase() ||
+                  message.author?.username?.[0]?.toUpperCase() ||
+                  message.author_display_name?.[0]?.toUpperCase() ||
+                  message.author_username?.[0]?.toUpperCase() ||
+                  'U'}
+              </span>
+            )}
           </div>
         ) : (
           <div className="w-10 flex-shrink-0 flex items-center justify-center">
