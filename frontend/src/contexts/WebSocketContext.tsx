@@ -17,6 +17,7 @@ interface ReactionData {
 interface WebSocketContextType {
   socket: Socket | null;
   isConnected: boolean;
+  onlineUsers: Set<string>;
   joinChannel: (channelId: string) => void;
   leaveChannel: (channelId: string) => void;
   sendMessage: (channelId: string, content: string) => void;
@@ -47,6 +48,7 @@ interface WebSocketProviderProps {
 export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const tokens = useAuthStore((state) => state.tokens);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const socketRef = useRef<Socket | null>(null);
@@ -90,6 +92,15 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     newSocket.on('connect', () => {
       console.log('✅ WebSocket connected:', newSocket.id);
       setIsConnected(true);
+
+      // Fetch initial list of online users
+      fetch(`${config.websocket.url}/online-users`)
+        .then(res => res.json())
+        .then(data => {
+          setOnlineUsers(new Set(data.online_users));
+          console.log('📊 Initial online users:', data.online_users);
+        })
+        .catch(err => console.error('Failed to fetch online users:', err));
     });
 
     newSocket.on('disconnect', (reason) => {
@@ -97,6 +108,27 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       setIsConnected(false);
       // Clear joined channels on disconnect
       joinedChannelsRef.current.clear();
+    });
+
+    // Listen for users coming online
+    newSocket.on('user_online', (data: { user_id: string }) => {
+      console.log('👤 User online:', data.user_id);
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.add(data.user_id);
+        console.log('📊 Updated online users (after add):', Array.from(newSet));
+        return newSet;
+      });
+    });
+
+    // Listen for users going offline
+    newSocket.on('user_offline', (data: { user_id: string }) => {
+      console.log('👤 User offline:', data.user_id);
+      setOnlineUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(data.user_id);
+        return newSet;
+      });
     });
 
     newSocket.on('connect_error', (error) => {
@@ -282,6 +314,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   const value: WebSocketContextType = {
     socket,
     isConnected,
+    onlineUsers,
     joinChannel,
     leaveChannel,
     sendMessage,

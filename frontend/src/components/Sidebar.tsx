@@ -10,12 +10,15 @@ import { Hash, Lock, ChevronDown, Plus, MessageSquare, LogOut } from 'lucide-rea
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { CreateChannelModal } from './CreateChannelModal';
+import { OnlineStatus } from './OnlineStatus';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user, logout } = useAuthStore();
+  const { onlineUsers } = useWebSocket();
   const [channelsExpanded, setChannelsExpanded] = useState(true);
   const [directMessagesExpanded, setDirectMessagesExpanded] = useState(true);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
@@ -49,7 +52,8 @@ export function Sidebar() {
     queryFn: async () => {
       try {
         const data = await authApi.get<User[]>('/auth/users');
-        console.log('Users data:', data);
+        console.log('📋 Users data from API:', data.length, 'users');
+        console.log('📋 User IDs:', data.map(u => ({ id: u.id, name: u.display_name || u.username })));
         // Ensure we always return an array
         return Array.isArray(data) ? data : [];
       } catch (error) {
@@ -66,10 +70,25 @@ export function Sidebar() {
   const privateChannels = channels.filter(c => c.channel_type === 'PRIVATE');
   const directMessages = channels.filter(c => c.channel_type === 'DIRECT');
 
-  // Get users excluding current user, limit to 12
+  // Get users excluding current user, prioritize online users, limit to 12
   const dmUsers = allUsers
     .filter(u => u.id !== user?.id)
+    .sort((a, b) => {
+      const aOnline = onlineUsers.has(a.id);
+      const bOnline = onlineUsers.has(b.id);
+      if (aOnline && !bOnline) return -1;
+      if (!aOnline && bOnline) return 1;
+      return 0;
+    })
     .slice(0, 12);
+
+  // Debug: Log online users state
+  console.log('🔍 Sidebar - Online users:', {
+    count: onlineUsers.size,
+    users: Array.from(onlineUsers),
+    dmUsersCount: dmUsers.length,
+    dmUsers: dmUsers.map(u => ({ id: u.id, name: u.display_name || u.username, online: onlineUsers.has(u.id) }))
+  });
 
   const createDMMutation = useMutation({
     mutationFn: async (selectedUser: User) => {
@@ -258,15 +277,7 @@ export function Sidebar() {
                         isActive ? 'bg-purple-700' : ''
                       }`}
                     >
-                      <div
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          dmUser.status === 'ACTIVE'
-                            ? 'bg-green-500'
-                            : dmUser.status === 'INACTIVE'
-                            ? 'bg-gray-400'
-                            : 'bg-red-500'
-                        }`}
-                      ></div>
+                      <OnlineStatus userId={dmUser.id} />
                       <span className="flex-1 truncate text-left">
                         {dmUser.display_name || dmUser.username}
                       </span>

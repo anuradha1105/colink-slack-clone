@@ -51,7 +51,7 @@ class RefreshTokenRequest(BaseModel):
 class UserInfo(BaseModel):
     """User information from token."""
 
-    id: str
+    id: str  # This is the Keycloak ID for compatibility with WebSocket
     username: str
     email: str  # Using str instead of EmailStr to allow .local domains in development
     display_name: Optional[str] = None
@@ -203,7 +203,7 @@ async def get_current_user(
         await db.commit()
 
         return UserInfo(
-            id=str(user.id),
+            id=user.keycloak_id,  # Use Keycloak ID for WebSocket compatibility
             username=user.username,
             email=user.email,
             display_name=user.display_name,
@@ -246,7 +246,7 @@ async def get_all_users(
 
         return [
             UserInfo(
-                id=str(user.id),
+                id=user.keycloak_id,  # Use Keycloak ID for WebSocket compatibility
                 username=user.username,
                 email=user.email,
                 display_name=user.display_name,

@@ -223,6 +223,13 @@ async def connect(sid, environ, auth):
             user_sessions[user_id].add(sid)
 
             logger.info(f"✅ User {user_id} connected with session {sid}")
+
+            # Broadcast that user is now online
+            await sio.emit(
+                "user_online",
+                {"user_id": user_id, "status": "online"},
+            )
+
             return True
 
         except Exception as e:
@@ -246,8 +253,14 @@ async def disconnect(sid):
             # Remove from user sessions
             if user_id in user_sessions:
                 user_sessions[user_id].discard(sid)
+                # Check if user has no more active sessions
                 if not user_sessions[user_id]:
                     del user_sessions[user_id]
+                    # Broadcast that user is now offline
+                    await sio.emit(
+                        "user_offline",
+                        {"user_id": user_id, "status": "offline"},
+                    )
 
             # Remove from channel rooms
             for channel_id in channels:
@@ -378,6 +391,15 @@ async def health_check():
         "service": "websocket",
         "connected_users": len(user_sessions),
         "active_channels": len(channel_rooms),
+    }
+
+
+@app.get("/online-users")
+async def get_online_users():
+    """Get list of currently online user IDs."""
+    return {
+        "online_users": list(user_sessions.keys()),
+        "count": len(user_sessions),
     }
 
 
