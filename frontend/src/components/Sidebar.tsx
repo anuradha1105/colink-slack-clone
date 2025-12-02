@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 import { CreateChannelModal } from './CreateChannelModal';
 import { OnlineStatus } from './OnlineStatus';
 import { useWebSocket } from '@/contexts/WebSocketContext';
+import { ProfileModal } from './ProfileModal';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -22,6 +23,7 @@ export function Sidebar() {
   const [channelsExpanded, setChannelsExpanded] = useState(true);
   const [directMessagesExpanded, setDirectMessagesExpanded] = useState(true);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ['channels'],
@@ -62,6 +64,14 @@ export function Sidebar() {
       }
     },
   });
+
+  // Refresh channels list when user updates to ensure DM avatars are fresh
+  // This is triggered when the profile modal updates the user query cache
+  useEffect(() => {
+    if (user) {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+  }, [user?.avatar_url, user?.display_name, queryClient]);
 
   // Note: Real-time notifications are disabled for now
   // Using polling (refetchInterval: 3000) to refresh unread counts instead
@@ -134,19 +144,26 @@ export function Sidebar() {
       </div>
 
       {/* User Info */}
-      <div className="px-4 py-3 border-b border-purple-800">
+      <button
+        onClick={() => setShowProfileModal(true)}
+        className="w-full px-4 py-3 border-b border-purple-800 hover:bg-purple-800 transition-colors"
+      >
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded bg-purple-600 flex items-center justify-center">
-            <span className="text-sm font-medium">
-              {user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}
-            </span>
+          <div className="w-8 h-8 rounded bg-purple-600 flex items-center justify-center overflow-hidden">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-sm font-medium">
+                {user?.display_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}
+              </span>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-medium truncate">{user?.display_name || user?.username}</p>
             <p className="text-xs text-purple-300 truncate">{user?.status_text || 'Active'}</p>
           </div>
         </div>
-      </div>
+      </button>
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
@@ -313,6 +330,12 @@ export function Sidebar() {
         onSuccess={(channel) => {
           router.push(`/channels/${channel.id}`);
         }}
+      />
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
       />
     </div>
   );

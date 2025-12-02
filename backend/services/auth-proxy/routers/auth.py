@@ -57,6 +57,7 @@ class UserInfo(BaseModel):
     email: str  # Using str instead of EmailStr to allow .local domains in development
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    phone_number: Optional[str] = None
     role: UserRole
     status: UserStatus
 
@@ -210,6 +211,7 @@ async def get_current_user(
             email=user.email,
             display_name=user.display_name,
             avatar_url=user.avatar_url,
+            phone_number=user.phone_number,
             role=user.role,
             status=user.status,
         )
@@ -254,6 +256,7 @@ async def get_all_users(
                 email=user.email,
                 display_name=user.display_name,
                 avatar_url=user.avatar_url,
+                phone_number=user.phone_number,
                 role=user.role,
                 status=user.status,
             )
@@ -267,4 +270,77 @@ async def get_all_users(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve users",
+        )
+
+
+class UpdateProfileRequest(BaseModel):
+    """Update profile request."""
+
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    phone_number: Optional[str] = None
+
+
+@router.patch("/me", response_model=UserInfo)
+async def update_profile(
+    profile_data: UpdateProfileRequest,
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(security),
+):
+    """Update current user's profile.
+
+    This endpoint allows users to update their display name, avatar, and phone number.
+    """
+    try:
+        # Extract token from Authorization header
+        access_token = token.credentials
+
+        # Validate token with Keycloak
+        keycloak = KeycloakService()
+        user_info = await keycloak.get_user_info(access_token)
+
+        # Get user from database
+        stmt = select(User).where(User.keycloak_id == user_info["sub"])
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        # Update user fields
+        if profile_data.display_name is not None:
+            user.display_name = profile_data.display_name
+        if profile_data.avatar_url is not None:
+            user.avatar_url = profile_data.avatar_url
+        if profile_data.phone_number is not None:
+            user.phone_number = profile_data.phone_number
+
+        user.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(user)
+
+        logger.info(f"User {user.username} updated profile")
+
+        return UserInfo(
+            id=str(user.id),
+            keycloak_id=user.keycloak_id,
+            username=user.username,
+            email=user.email,
+            display_name=user.display_name,
+            avatar_url=user.avatar_url,
+            phone_number=user.phone_number,
+            role=user.role,
+            status=user.status,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update profile: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile",
         )

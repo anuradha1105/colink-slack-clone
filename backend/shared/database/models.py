@@ -116,6 +116,7 @@ class User(Base, TimestampMixin):
     # Profile fields
     display_name: Mapped[Optional[str]] = mapped_column(String(255))
     avatar_url: Mapped[Optional[str]] = mapped_column(String(512))
+    phone_number: Mapped[Optional[str]] = mapped_column(String(20))
     status_text: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Status and role

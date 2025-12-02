@@ -5,6 +5,7 @@ export interface User {
   email: string;
   display_name?: string;
   avatar_url?: string;
+  phone_number?: string;
   status_text?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
   role: 'ADMIN' | 'MODERATOR' | 'MEMBER';
