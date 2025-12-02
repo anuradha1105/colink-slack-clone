@@ -13,18 +13,18 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements files
-COPY requirements.txt requirements-dev.txt ./
-COPY services/notifications/requirements.txt ./services/notifications/
+COPY backend/requirements.txt backend/requirements-dev.txt ./
+COPY backend/services/notifications/requirements.txt ./services/notifications/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r services/notifications/requirements.txt
 
 # Copy shared module
-COPY shared/ ./shared/
+COPY backend/shared/ ./shared/
 
 # Copy service code
-COPY services/notifications/ ./services/notifications/
+COPY backend/services/notifications/ ./services/notifications/
 
 # Expose port
 EXPOSE 8008

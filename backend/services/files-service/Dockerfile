@@ -8,19 +8,20 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY services/files-service/requirements.txt ./services/files-service/
+COPY backend/services/files-service/requirements.txt ./services/files-service/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r services/files-service/requirements.txt
 
 # Copy shared module
-COPY shared /app/shared
+COPY backend/shared/ /app/shared
 
 # Copy service code
-COPY services/files-service /app/services/files-service
+COPY backend/services/files-service /app/services/files-service
 
 # Expose port
 EXPOSE 8007

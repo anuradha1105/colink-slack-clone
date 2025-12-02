@@ -13,18 +13,18 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements files
-COPY requirements.txt requirements-dev.txt ./
-COPY services/message/requirements.txt ./services/message/
+COPY backend/requirements.txt backend/requirements-dev.txt ./
+COPY backend/services/message/requirements.txt ./services/message/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r services/message/requirements.txt
 
 # Copy shared module
-COPY shared/ ./shared/
+COPY backend/shared/ ./shared/
 
 # Copy service code
-COPY services/message/ ./services/message/
+COPY backend/services/message/ ./services/message/
 
 # Expose port
 EXPOSE 8002

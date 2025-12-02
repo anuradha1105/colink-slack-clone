@@ -13,18 +13,18 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements files
-COPY requirements.txt requirements-dev.txt ./
-COPY services/auth-proxy/requirements.txt ./services/auth-proxy/
+COPY backend/requirements.txt backend/requirements-dev.txt ./
+COPY backend/services/auth-proxy/requirements.txt ./services/auth-proxy/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r services/auth-proxy/requirements.txt
 
 # Copy shared module
-COPY shared/ ./shared/
+COPY backend/shared/ ./shared/
 
 # Copy auth-proxy service
-COPY services/auth-proxy/ ./services/auth-proxy/
+COPY backend/services/auth-proxy/ ./services/auth-proxy/
 
 # Set Python path to include app directory
 ENV PYTHONPATH=/app

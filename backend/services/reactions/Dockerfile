@@ -13,25 +13,25 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements files
-COPY requirements.txt requirements-dev.txt ./
-COPY services/threads/requirements.txt ./services/threads/
+COPY backend/requirements.txt backend/requirements-dev.txt ./
+COPY backend/services/reactions/requirements.txt ./services/reactions/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r services/threads/requirements.txt
+    pip install --no-cache-dir -r services/reactions/requirements.txt
 
 # Copy shared module
-COPY shared/ ./shared/
+COPY backend/shared/ ./shared/
 
 # Copy service code
-COPY services/threads/ ./services/threads/
+COPY backend/services/reactions/ ./services/reactions/
 
 # Expose port
-EXPOSE 8005
+EXPOSE 8006
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8005/health')"
+    CMD python -c "import httpx; httpx.get('http://localhost:8006/health')"
 
 # Run the application
-CMD ["uvicorn", "services.threads.main:app", "--host", "0.0.0.0", "--port", "8005"]
+CMD ["uvicorn", "services.reactions.main:app", "--host", "0.0.0.0", "--port", "8006"]

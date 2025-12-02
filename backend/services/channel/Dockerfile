@@ -12,16 +12,16 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy shared code first
-COPY shared/ /app/shared/
+COPY backend/shared/ /app/shared/
 
 # Copy service requirements
-COPY services/channel/requirements.txt /app/services/channel/
+COPY backend/services/channel/requirements.txt /app/services/channel/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r /app/services/channel/requirements.txt
 
 # Copy service code
-COPY services/channel/ /app/services/channel/
+COPY backend/services/channel/ /app/services/channel/
 
 # Set Python path to include /app so 'shared' module can be imported
 ENV PYTHONPATH=/app
