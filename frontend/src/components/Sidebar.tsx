@@ -74,8 +74,8 @@ export function Sidebar() {
   const dmUsers = allUsers
     .filter(u => u.id !== user?.id)
     .sort((a, b) => {
-      const aOnline = onlineUsers.has(a.id);
-      const bOnline = onlineUsers.has(b.id);
+      const aOnline = onlineUsers.has(a.keycloak_id);
+      const bOnline = onlineUsers.has(b.keycloak_id);
       if (aOnline && !bOnline) return -1;
       if (!aOnline && bOnline) return 1;
       return 0;
@@ -87,7 +87,7 @@ export function Sidebar() {
     count: onlineUsers.size,
     users: Array.from(onlineUsers),
     dmUsersCount: dmUsers.length,
-    dmUsers: dmUsers.map(u => ({ id: u.id, name: u.display_name || u.username, online: onlineUsers.has(u.id) }))
+    dmUsers: dmUsers.map(u => ({ id: u.id, keycloak_id: u.keycloak_id, name: u.display_name || u.username, online: onlineUsers.has(u.keycloak_id) }))
   });
 
   const createDMMutation = useMutation({
@@ -277,7 +277,7 @@ export function Sidebar() {
                         isActive ? 'bg-purple-700' : ''
                       }`}
                     >
-                      <OnlineStatus userId={dmUser.id} />
+                      <OnlineStatus userId={dmUser.keycloak_id} />
                       <span className="flex-1 truncate text-left">
                         {dmUser.display_name || dmUser.username}
                       </span>

@@ -1,5 +1,6 @@
 export interface User {
-  id: string;
+  id: string;  // Database UUID - used for API calls
+  keycloak_id: string;  // Keycloak ID - used for WebSocket online status
   username: string;
   email: string;
   display_name?: string;
