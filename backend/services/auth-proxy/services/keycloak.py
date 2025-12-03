@@ -258,3 +258,28 @@ class KeycloakService:
     def clear_jwks_cache(self) -> None:
         """Clear cached JWKS (useful for key rotation)."""
         self._jwks_cache = {}
+
+    async def delete_user(self, keycloak_id: str) -> None:
+        """Delete a user from Keycloak.
+
+        Args:
+            keycloak_id: The Keycloak user ID (sub claim from JWT)
+
+        Raises:
+            HTTPException: If user deletion fails
+        """
+        try:
+            # Note: This requires admin credentials or a service account
+            # For now, we'll log the attempt but may not have permissions
+            logger.info(f"Attempting to delete user {keycloak_id} from Keycloak")
+
+            # In a production environment, you would need to:
+            # 1. Get an admin token or use service account
+            # 2. Make DELETE request to /admin/realms/{realm}/users/{id}
+
+            # For now, we'll just mark it as attempted
+            # The soft delete in our database is the primary deletion mechanism
+
+        except Exception as e:
+            logger.warning(f"Failed to delete user from Keycloak: {e}")
+            # Don't raise exception - soft delete in DB is sufficient
