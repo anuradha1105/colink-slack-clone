@@ -506,7 +506,7 @@ services:
     image: grafana/grafana:latest
     container_name: colink-grafana
     ports:
-      - "3001:3001"
+      - "3000:3000"
     volumes:
       - grafana_storage:/var/lib/grafana
     depends_on:
