@@ -55,6 +55,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
             ...msg,
             author: {
               id: msg.author_id,
+              keycloak_id: '',  // Not available in message response
               username: msg.author_username || '',
               display_name: msg.author_display_name,
               email: '',
@@ -101,6 +102,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
           ...msg,
           author: {
             id: msg.author_id,
+            keycloak_id: '',  // Not available in message response
             username: msg.author_username || '',
             display_name: msg.author_display_name,
             email: '',
