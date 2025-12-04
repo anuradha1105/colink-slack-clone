@@ -146,6 +146,7 @@ class KeycloakSetup:
             "enabled": True,
             "firstName": username.capitalize(),
             "lastName": "User",
+            "requiredActions": [],
             "credentials": [{
                 "type": "password",
                 "value": password,
@@ -166,14 +167,50 @@ class KeycloakSetup:
                 
                 return True
             elif response.status_code == 409:
-                print(f"⚠️  User '{username}' already exists")
-                return True
+                print(f"⚠️  User '{username}' already exists - deleting and recreating...")
+                # Delete existing user
+                self.delete_user(realm_name, username)
+                time.sleep(0.5)
+                # Retry creation
+                response = requests.post(url, headers=headers, json=user_config)
+                if response.status_code == 201:
+                    print(f"✅ User '{username}' recreated successfully")
+                    return True
+                else:
+                    print(f"❌ Failed to recreate user: {response.status_code}")
+                    return False
             else:
                 print(f"❌ Failed to create user: {response.status_code}")
                 print(f"   Response: {response.text}")
                 return False
         except Exception as e:
             print(f"❌ Error creating user: {e}")
+            return False
+    
+    def delete_user(self, realm_name: str, username: str) -> bool:
+        """Delete a user from the realm"""
+        try:
+            # First, find the user by username
+            url = f"{self.base_url}/admin/realms/{realm_name}/users?username={username}"
+            headers = {
+                "Authorization": f"Bearer {self.admin_token}",
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                users = response.json()
+                if users:
+                    user_id = users[0]['id']
+                    # Delete the user
+                    delete_url = f"{self.base_url}/admin/realms/{realm_name}/users/{user_id}"
+                    delete_response = requests.delete(delete_url, headers=headers)
+                    if delete_response.status_code == 204:
+                        print(f"   Deleted existing user '{username}'")
+                        return True
+            return False
+        except Exception as e:
+            print(f"   Error deleting user: {e}")
             return False
     
     def setup_colink_realm(self):

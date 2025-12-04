@@ -55,7 +55,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
             ...msg,
             author: {
               id: msg.author_id,
-              keycloak_id: '',  // Not available in message response
+              keycloak_id: msg.author_id, // Use author_id as fallback for keycloak_id
               username: msg.author_username || '',
               display_name: msg.author_display_name,
               email: '',
@@ -102,7 +102,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
           ...msg,
           author: {
             id: msg.author_id,
-            keycloak_id: '',  // Not available in message response
+            keycloak_id: msg.author_id, // Use author_id as fallback for keycloak_id
             username: msg.author_username || '',
             display_name: msg.author_display_name,
             email: '',
