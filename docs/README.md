@@ -45,7 +45,7 @@ All detailed specs (API contracts, event schemas, database DDL, security configs
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| Runtime | Python | 3.12 |
+| Runtime | Python | 3.11 |
 | Framework | FastAPI | 0.109+ |
 | ASGI Server | Uvicorn | 0.27+ |
 | Database | PostgreSQL | 16 |

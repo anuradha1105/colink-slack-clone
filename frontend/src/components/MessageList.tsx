@@ -12,18 +12,31 @@ interface MessageListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  searchQuery?: string;
 }
 
-export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoadingMore, onLoadMore }: MessageListProps) {
+export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoadingMore, onLoadMore, searchQuery }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesStartRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const scrollToTop = () => {
+    containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (searchQuery) {
+      // Scroll to top only when search query first appears or changes
+      scrollToTop();
+    } else {
+      // Only auto-scroll to bottom when not searching
+      scrollToBottom();
+    }
+  }, [searchQuery]); // Only depend on searchQuery, not messages
 
   if (isLoading) {
     return (
@@ -32,6 +45,11 @@ export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoad
       </div>
     );
   }
+
+  // Filter messages based on search query
+  const filteredMessages = searchQuery
+    ? messages.filter(msg => msg.content.toLowerCase().includes(searchQuery.toLowerCase()))
+    : messages;
 
   if (messages.length === 0) {
     return (
@@ -44,11 +62,30 @@ export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoad
     );
   }
 
+  if (searchQuery && filteredMessages.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-gray-600 text-lg">No messages found</p>
+          <p className="text-gray-500 text-sm mt-2">No messages contain "{searchQuery}"</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4">
+    <div ref={containerRef} className="flex-1 overflow-y-auto bg-gray-50 px-4 py-4">
+      <div ref={messagesStartRef} />
+      {searchQuery && (
+        <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <p className="text-sm text-purple-800">
+            Showing {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''} matching "{searchQuery}"
+          </p>
+        </div>
+      )}
       <div className="space-y-4">
-        {/* Load More Button */}
-        {hasMore && (
+        {/* Load More Button - only show when not searching */}
+        {!searchQuery && hasMore && (
           <div className="flex justify-center pb-4">
             <button
               onClick={onLoadMore}
@@ -70,8 +107,8 @@ export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoad
           </div>
         )}
 
-        {messages.map((message, index) => {
-          const previousMessage = index > 0 ? messages[index - 1] : null;
+        {filteredMessages.map((message, index) => {
+          const previousMessage = index > 0 ? filteredMessages[index - 1] : null;
           const showAvatar = !previousMessage || previousMessage.author_id !== message.author_id;
 
           return (
@@ -80,6 +117,7 @@ export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoad
               message={message}
               showAvatar={showAvatar}
               onReplyClick={onReplyClick}
+              highlightText={searchQuery}
             />
           );
         })}

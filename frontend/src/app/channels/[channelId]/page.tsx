@@ -25,6 +25,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
   const { joinChannel, leaveChannel, onNewMessage, onMessageUpdated, onMessageDeleted, onTyping, onReactionAdded, onReactionRemoved } = useWebSocket();
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map()); // userId -> username
   const [selectedThread, setSelectedThread] = useState<Message | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { data: channel, isLoading: channelLoading } = useQuery({
     queryKey: ['channel', channelId],
@@ -54,6 +55,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
             ...msg,
             author: {
               id: msg.author_id,
+              keycloak_id: msg.author_id, // Use author_id as fallback for keycloak_id
               username: msg.author_username || '',
               display_name: msg.author_display_name,
               email: '',
@@ -100,6 +102,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
           ...msg,
           author: {
             id: msg.author_id,
+            keycloak_id: msg.author_id, // Use author_id as fallback for keycloak_id
             username: msg.author_username || '',
             display_name: msg.author_display_name,
             email: '',
@@ -112,7 +115,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
         const reversed = messagesWithAuthor.reverse();
 
         queryClient.setQueryData<Message[]>(['messages', channelId], (old = []) => {
-          return [...reversed, ...old];
+          return [...reversed, ...old] as Message[];
         });
       }
     } catch (error) {
@@ -353,7 +356,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
 
   return (
     <div className="flex flex-col h-full relative">
-      <ChannelHeader channel={channel} />
+      <ChannelHeader channel={channel} onSearch={setSearchQuery} />
       <MessageList
         messages={messages}
         isLoading={messagesLoading}
@@ -361,6 +364,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
         hasMore={hasMore}
         isLoadingMore={isLoadingMore}
         onLoadMore={loadMoreMessages}
+        searchQuery={searchQuery}
       />
       <TypingIndicator usernames={Array.from(typingUsers.values())} />
       <MessageInput channelId={channelId} />

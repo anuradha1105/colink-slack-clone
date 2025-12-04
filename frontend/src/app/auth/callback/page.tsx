@@ -16,6 +16,8 @@ function AuthCallbackContent() {
       const code = searchParams.get('code');
       const errorParam = searchParams.get('error');
 
+      console.log('Auth callback - code:', code ? 'present' : 'missing', 'error:', errorParam);
+
       if (errorParam) {
         setError(`Authentication failed: ${errorParam}`);
         return;
@@ -28,16 +30,25 @@ function AuthCallbackContent() {
 
       try {
         // Exchange code for tokens
+        console.log('Exchanging code for tokens...');
         const tokens = await AuthService.exchangeCodeForToken(code);
+        console.log('Tokens received:', tokens ? 'yes' : 'no');
 
         // Get user info
         const user = await AuthService.getCurrentUser(tokens.access_token);
+        console.log('User info:', user.username, 'role:', user.role);
 
         // Save to store and localStorage
         setAuth(user, tokens);
 
-        // Redirect to channels
-        router.push('/channels');
+        // Redirect based on user role (case-insensitive check)
+        if (user.role?.toLowerCase() === 'admin') {
+          console.log('Admin user detected, redirecting to /admin');
+          router.push('/admin');
+        } else {
+          console.log('Regular user, redirecting to /channels');
+          router.push('/channels');
+        }
       } catch (err) {
         console.error('Auth callback error:', err);
         setError('Failed to complete authentication');

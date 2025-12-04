@@ -1,12 +1,13 @@
-# Colink - Slack-like Collaboration Platform
+# Colink - Real-time Collaboration Platform
 
 [![Architecture](https://img.shields.io/badge/docs-architecture-blue)](./ARCHITECTURE.md)
-[![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.0-black)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-> **Real-time collaboration platform** built with microservices architecture, featuring channels, direct messages, file sharing, and full-text search.
+> **Production-ready collaboration platform** built with modern microservices architecture, featuring real-time messaging, channels, direct messages, file sharing, analytics, and comprehensive admin tools.
 
 ---
 
@@ -20,76 +21,164 @@ cd colink-slack-clone
 # Start all services with Docker Compose
 docker-compose up -d
 
+# Wait for services to be healthy (~30-60 seconds)
+docker-compose ps
+
+# Set up superadmin user
+docker exec colink-auth-proxy python /app/scripts/setup_superadmin.py
+
 # Access the platform
-# API Gateway: http://localhost
-# Keycloak Admin: http://localhost:8080/admin
-# MinIO Console: http://localhost:9001
+# Frontend: http://localhost:3000
+# Superadmin credentials:
+#   Username: superadmin
+#   Password: SuperAdmin@123
 ```
 
----
-
-## 📚 Documentation
-
-Comprehensive architecture documentation is available:
-
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Master architecture index
-- **[Executive Summary](./docs/architecture/00-executive-summary.md)** - Technology stack and design decisions
-- **[System Architecture](./docs/architecture/01-system-architecture.md)** - C4 diagrams and service descriptions
-- **[Data Flows](./docs/architecture/02-data-flows.md)** - Sequence diagrams for core user journeys
-- **[Security Model](./docs/architecture/03-security-model.md)** - Authentication, authorization, and compliance
-- **[Scalability & Reliability](./docs/architecture/04-scalability-reliability.md)** - Scaling patterns and fault tolerance
-- **[Service Inventory](./docs/architecture/05-service-inventory.md)** - Detailed catalog of all microservices
+See **[QUICKSTART.md](./QUICKSTART.md)** for detailed setup instructions.
 
 ---
 
 ## ✨ Features
 
 ### Core Functionality
-- ✅ **Authentication**: OAuth 2.0/OIDC via Keycloak with mandatory 2FA (TOTP/WebAuthn)
+- ✅ **Modern UI**: Next.js 16 with Turbopack, TailwindCSS, React Query
+- ✅ **Authentication**: OAuth 2.0/OIDC via Keycloak integration
 - ✅ **Real-time Messaging**: WebSocket-based instant message delivery
-- ✅ **Channels & DMs**: Public/private channels and direct messages
+- ✅ **Channels**: Public and private channels with member management
+- ✅ **Direct Messages**: One-on-one conversations
 - ✅ **Threaded Conversations**: Organize discussions with message threads
-- ✅ **Emoji Reactions**: React to messages with emojis
-- ✅ **File Sharing**: Upload/download with virus scanning (ClamAV)
-- ✅ **Full-text Search**: Search messages, files, and users (OpenSearch)
-- ✅ **Presence & Typing**: Online status and typing indicators
-- ✅ **Admin Moderation**: User management and message moderation
+- ✅ **Emoji Reactions**: React to messages with emoji support
+- ✅ **File Sharing**: Upload and share files with MinIO object storage
+- ✅ **Presence System**: Online status and typing indicators
+- ✅ **User Profiles**: Customizable profiles with avatars
+- ✅ **Notifications**: Real-time push notifications
+
+### Admin & Analytics
+- ✅ **Admin Dashboard**: User management, role assignment, user deletion
+- ✅ **Analytics Dashboard**: Usage statistics, channel activity, message trends
+- ✅ **Role-Based Access**: Admin, Moderator, Member, Guest roles
+- ✅ **Superadmin Mode**: Hidden admin user for system management
+- ✅ **Monitoring**: Prometheus metrics, Grafana dashboards
 - ✅ **Audit Logging**: Comprehensive activity tracking
+
+### Developer Experience
+- ✅ **Hot Reload**: Fast development with Next.js Turbopack
+- ✅ **Type Safety**: Full TypeScript support
+- ✅ **API Documentation**: Auto-generated Swagger/OpenAPI docs
+- ✅ **Docker Compose**: One-command setup for all services
+- ✅ **Health Checks**: Built-in health monitoring for all services
 
 ---
 
 ## 🏗️ Architecture
 
-### Microservices (12 Total)
+### Microservices (10 Services)
 
-| Service | Responsibilities | Port |
-|---------|-----------------|------|
-| **api-gateway** | Routing, TLS, rate limiting | 80/443 |
-| **auth-proxy** | Keycloak integration, JWT validation | 8001 |
-| **users-service** | User profiles, settings | 8002 |
-| **channels-service** | Channel CRUD, membership | 8003 |
-| **messaging-service** | Messages, DMs | 8004 |
-| **threads-service** | Thread replies | 8005 |
-| **reactions-service** | Emoji reactions | 8006 |
-| **presence-service** | Online status, typing | 8007 |
-| **files-service** | File upload/download | 8008 |
-| **search-service** | Full-text search | 8009 |
-| **admin-service** | Moderation, audit | 8010 |
-| **realtime-gateway** | WebSocket connections | 8011 |
+| Service | Responsibilities | Port | Status |
+|---------|-----------------|------|--------|
+| **frontend** | Next.js 16 web application | 3000 | ✅ Production |
+| **auth-proxy** | Authentication, JWT validation, admin API | 8001 | ✅ Production |
+| **channel** | Channel CRUD, membership management | 8003 | ✅ Production |
+| **message** | Messages, DMs, analytics API | 8002 | ✅ Production |
+| **threads** | Thread replies and management | 8005 | ✅ Production |
+| **reactions** | Emoji reactions to messages | 8006 | ✅ Production |
+| **files** | File upload/download, MinIO integration | 8007 | ✅ Production |
+| **notifications** | Push notifications, user alerts | 8008 | ✅ Production |
+| **websocket** | Real-time WebSocket connections | 8009 | ✅ Production |
+
+### Infrastructure Components
+
+| Component | Technology | Port | Purpose |
+|-----------|-----------|------|---------|
+| **postgres** | PostgreSQL 16 | 5432 | Primary database |
+| **redis** | Redis 7 | 6379 | Caching & session storage |
+| **redpanda** | Kafka-compatible | 19092 | Event streaming |
+| **keycloak** | Keycloak 23.x | 8080 | Identity & access management |
+| **minio** | MinIO S3-compatible | 9000, 9001 | Object storage |
+| **opensearch** | OpenSearch 2.x | 9200 | Full-text search |
+| **prometheus** | Prometheus | 9090 | Metrics collection |
+| **grafana** | Grafana | 3001 | Metrics visualization |
 
 ### Technology Stack
 
-| Component | Technology |
-|-----------|-----------|
-| **Runtime** | Python 3.12 |
-| **Framework** | FastAPI + Uvicorn |
-| **Database** | PostgreSQL 16 |
-| **Cache** | Redis 7 |
-| **Message Queue** | Redpanda (Kafka-compatible) |
-| **Object Storage** | MinIO / S3 |
-| **Search** | OpenSearch 2.x |
-| **Identity** | Keycloak 23.x |
-| **Gateway** | Traefik 3.x |
+#### Frontend
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| **Framework** | Next.js | 16.0.4 |
+| **Build Tool** | Turbopack | Latest |
+| **UI Library** | React | 19.x |
+| **Styling** | TailwindCSS | 3.x |
+| **State Management** | Zustand, React Query | Latest |
+| **Icons** | Lucide React | Latest |
+| **Forms** | React Hook Form | Latest |
+
+#### Backend
+| Component | Technology | Version |
+|-----------|-----------|---------|
+| **Runtime** | Python | 3.11 |
+| **Framework** | FastAPI | 0.115+ |
+| **Server** | Uvicorn | Latest |
+| **Database** | PostgreSQL | 16 |
+| **ORM** | SQLAlchemy | 2.0 |
+| **Cache** | Redis | 7 |
+| **Message Queue** | Redpanda (Kafka) | Latest |
+| **Auth** | Keycloak | 23.x |
+
+---
+
+## 📁 Project Structure
+
+```
+colink-slack-clone/
+├── frontend/                 # Next.js 16 frontend application
+│   ├── src/
+│   │   ├── app/             # Next.js app router pages
+│   │   │   ├── admin/       # Admin dashboard
+│   │   │   ├── analytics/   # Analytics dashboard
+│   │   │   ├── auth/        # Authentication pages
+│   │   │   ├── channels/    # Channel pages
+│   │   │   └── login/       # Login page
+│   │   ├── components/      # React components
+│   │   ├── contexts/        # React contexts (WebSocket, etc.)
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── lib/             # API clients, utilities
+│   │   ├── store/           # Zustand stores
+│   │   └── types/           # TypeScript types
+│   ├── public/              # Static assets
+│   └── package.json
+│
+├── backend/
+│   ├── shared/              # Shared database models and utilities
+│   │   └── database/        # SQLAlchemy models
+│   └── services/
+│       ├── auth-proxy/      # Authentication service
+│       ├── channel/         # Channel management
+│       ├── message/         # Messaging + Analytics
+│       ├── threads/         # Thread management
+│       ├── reactions/       # Emoji reactions
+│       ├── files-service/   # File storage
+│       ├── notifications/   # Notifications
+│       └── websocket/       # WebSocket gateway
+│
+├── scripts/                 # Utility scripts
+│   ├── setup_superadmin.sh  # Bash script for superadmin setup
+│   ├── setup_superadmin.py  # Python script for superadmin setup (recommended)
+│   └── README.md            # Scripts documentation
+│
+├── monitoring/              # Monitoring configurations
+│   └── grafana-dashboard.json
+│
+├── docs/                    # Documentation
+│   ├── architecture/        # Architecture docs
+│   └── diagrams/           # System diagrams
+│
+├── docker-compose.yml       # Docker Compose configuration
+├── ARCHITECTURE.md          # Architecture overview
+├── QUICKSTART.md           # Quick start guide
+├── SUPERADMIN_SETUP.md     # Superadmin setup guide
+├── RECENT_CHANGES.md       # Recent changes and updates
+└── README.md               # This file
+```
 
 ---
 
@@ -97,64 +186,93 @@ Comprehensive architecture documentation is available:
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Python 3.12+
-- Node.js 18+ (for frontend, future)
+- Docker Desktop or Docker Engine with Docker Compose
+- Git
+- (Optional) Python 3.11+ for local backend development
+- (Optional) Node.js 20+ for local frontend development
 
-### Local Development
+### Quick Setup
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/darshlukkad/colink-slack-clone.git
 cd colink-slack-clone
 
-# 2. Copy environment file
-cp .env.example .env
-
-# 3. Start infrastructure services
-docker-compose up -d postgres redis kafka minio keycloak opensearch clamav
-
-# 4. Run database migrations
-make migrate
-
-# 5. Seed test data
-make seed
-
-# 6. Start application services
+# 2. Start all services
 docker-compose up -d
 
-# 7. View logs
-docker-compose logs -f messaging-service
-```
-
-### Verify Services
-
-```bash
-# Check all services are running
+# 3. Wait for services to be healthy
 docker-compose ps
 
-# Health checks
-curl http://localhost/health
-curl http://localhost:8001/health  # Auth Proxy
-curl http://localhost:8002/health  # Users Service
+# 4. Set up superadmin
+docker exec colink-auth-proxy python /app/scripts/setup_superadmin.py
+
+# 5. Access the application
+open http://localhost:3000
 ```
+
+### Verify Installation
+
+```bash
+# Check all services are running and healthy
+docker-compose ps
+
+# Expected output: All services should show "Up" and "(healthy)"
+# Example:
+# colink-frontend     Up 2 minutes (healthy)
+# colink-auth-proxy   Up 2 minutes (healthy)
+# colink-message      Up 2 minutes (healthy)
+# ...
+
+# Check frontend logs
+docker logs colink-frontend
+
+# Check backend logs
+docker logs colink-message
+```
+
+### Access Points
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **Frontend** | http://localhost:3000 | superadmin / SuperAdmin@123 |
+| **Keycloak Admin** | http://localhost:8080/admin | admin / admin |
+| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
+| **Grafana** | http://localhost:3001 | admin / admin |
+| **Prometheus** | http://localhost:9090 | N/A |
 
 ---
 
 ## 🧪 Testing
 
+### Frontend Testing
+
 ```bash
-# Run unit tests
-pytest tests/unit
+cd frontend
 
-# Run integration tests
-pytest tests/integration
+# Run tests
+npm test
 
-# Run all tests with coverage
-pytest --cov=src --cov-report=html
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Backend Testing
+
+```bash
+cd backend
+
+# Run all tests
+pytest
 
 # Run specific service tests
-pytest tests/unit/test_messaging_service.py
+pytest services/message/tests/
+
+# Run with coverage
+pytest --cov=services --cov-report=html
 ```
 
 ---
@@ -165,48 +283,70 @@ pytest tests/unit/test_messaging_service.py
 
 Once services are running, access interactive API documentation:
 
-- Auth Proxy: http://localhost:8001/docs
-- Users Service: http://localhost:8002/docs
-- Channels Service: http://localhost:8003/docs
-- Messaging Service: http://localhost:8004/docs
-- Threads Service: http://localhost:8005/docs
-- Reactions Service: http://localhost:8006/docs
-- Presence Service: http://localhost:8007/docs
-- Files Service: http://localhost:8008/docs
-- Search Service: http://localhost:8009/docs
-- Admin Service: http://localhost:8010/docs
+- **Auth Proxy**: http://localhost:8001/docs
+- **Channel Service**: http://localhost:8003/docs
+- **Message Service**: http://localhost:8002/docs
+- **Threads Service**: http://localhost:8005/docs
+- **Reactions Service**: http://localhost:8006/docs
+- **Files Service**: http://localhost:8007/docs
+- **Notifications Service**: http://localhost:8008/docs
 
-### Example: Send a Message
+### Example API Calls
 
 ```bash
-# 1. Login and get token
-TOKEN=$(curl -X POST http://localhost/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice@colink.dev", "password": "password123"}' \
-  | jq -r '.accessToken')
+# 1. Login via Keycloak (handled by frontend)
+# Frontend redirects to http://localhost:8080/realms/colink/protocol/openid-connect/auth
 
-# 2. Send message to channel
-curl -X POST http://localhost/v1/messages \
-  -H "Authorization: Bearer $TOKEN" \
+# 2. Get all channels (authenticated)
+curl http://localhost:8003/channels \
+  -H "Authorization: Bearer <YOUR_TOKEN>"
+
+# 3. Send a message
+curl -X POST http://localhost:8002/messages \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: $(uuidgen)" \
   -d '{
-    "channelId": "01HQZ01ABC2DEF3GHI4JKL5MNO",
-    "text": "Hello team! 👋"
+    "channel_id": "<CHANNEL_ID>",
+    "text": "Hello, Colink!"
   }'
+
+# 4. Get analytics (admin only)
+curl http://localhost:8002/analytics/summary \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
 ```
 
 ---
 
 ## 🔐 Security
 
-- **Authentication**: OAuth 2.0 / OIDC via Keycloak
-- **2FA**: Mandatory (TOTP or WebAuthn)
-- **Authorization**: Role-based access control (admin, moderator, member, guest)
-- **Encryption**: TLS 1.3 for all external communication
-- **File Scanning**: ClamAV virus scanning before delivery
-- **Rate Limiting**: 100 req/min per IP, 1000 req/min per user
-- **Secrets**: Environment variables (dev), Kubernetes Secrets (prod)
+### Authentication & Authorization
+- **OAuth 2.0/OIDC**: Full integration with Keycloak
+- **JWT Tokens**: Secure token-based authentication
+- **Role-Based Access Control (RBAC)**:
+  - **Admin**: Full system access, user management, analytics
+  - **Moderator**: Channel moderation, content management
+  - **Member**: Standard user access
+  - **Guest**: Limited read-only access
+- **Superadmin**: Hidden system administrator (excluded from user lists)
+
+### Security Features
+- **TLS/HTTPS**: All production traffic encrypted
+- **Token Refresh**: Automatic token refresh on expiry
+- **Rate Limiting**: Protection against abuse
+- **CORS**: Configured cross-origin resource sharing
+- **File Validation**: File type and size validation
+- **XSS Protection**: Content sanitization
+
+### Default Credentials
+
+⚠️ **Change these in production!**
+
+| Service | Username | Password |
+|---------|----------|----------|
+| Superadmin | superadmin | SuperAdmin@123 |
+| Keycloak Admin | admin | admin |
+| MinIO | minioadmin | minioadmin |
+| Grafana | admin | admin |
 
 ---
 
@@ -218,74 +358,255 @@ curl -X POST http://localhost/v1/messages \
 # Start all services
 docker-compose up -d
 
-# Scale specific service
-docker-compose up -d --scale messaging-service=3
+# View logs
+docker-compose logs -f
 
 # Stop all services
 docker-compose down
+
+# Stop and remove volumes (⚠️ deletes data)
+docker-compose down -v
 ```
 
-### Kubernetes (Production - Optional)
+### Production Deployment
+
+For production deployment:
+
+1. **Update Environment Variables**:
+   - Set strong passwords for all services
+   - Configure proper domain names
+   - Set `NODE_ENV=production`
+   - Enable HTTPS/TLS
+
+2. **Use External Databases** (recommended):
+   - Managed PostgreSQL (AWS RDS, Google Cloud SQL)
+   - Managed Redis (ElastiCache, Google Memorystore)
+   - Managed Kafka (Confluent Cloud, AWS MSK)
+
+3. **Enable Monitoring**:
+   - Configure Prometheus alerts
+   - Set up Grafana dashboards
+   - Enable error tracking (Sentry)
+
+4. **Backup Strategy**:
+   - Automated database backups
+   - Object storage replication
+   - Disaster recovery plan
+
+---
+
+## 📊 Monitoring & Observability
+
+### Grafana Dashboards
+
+Pre-configured dashboards available at http://localhost:3001:
+
+- **System Overview**: CPU, memory, disk usage
+- **Service Health**: Request rates, error rates, latencies
+- **Business Metrics**: Active users, message counts, channel activity
+- **Database**: Connection pool, query performance
+- **WebSocket**: Active connections, message throughput
+
+### Prometheus Metrics
+
+Key metrics exposed by services:
+
+- `http_request_duration_seconds` - API latency
+- `http_requests_total` - Request counts
+- `websocket_connections` - Active WebSocket connections
+- `kafka_consumer_lag` - Message queue lag
+- `db_connection_pool_size` - Database connection usage
+
+### Log Aggregation
 
 ```bash
-# Apply manifests
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/secrets.yaml
-kubectl apply -f k8s/postgres.yaml
-kubectl apply -f k8s/redis.yaml
-kubectl apply -f k8s/kafka.yaml
-kubectl apply -f k8s/services/
+# View logs for specific service
+docker logs colink-frontend
+docker logs colink-message
 
-# Check status
-kubectl -n colink get pods
+# Follow logs in real-time
+docker logs -f colink-websocket
 
-# View logs
-kubectl -n colink logs -f deployment/messaging-service
+# View logs for all services
+docker-compose logs -f
 ```
 
 ---
 
-## 📊 Monitoring
+## 🎯 Key Features
 
-### Metrics & Logs
+### Admin Dashboard
+- **User Management**: View, create, delete users
+- **Role Assignment**: Assign admin/moderator roles
+- **User Search**: Filter and search users
+- **Activity Monitoring**: Track user activity
 
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000
-- **Jaeger**: http://localhost:16686
-- **Kafka UI**: http://localhost:8081
+### Analytics Dashboard
+- **Total Counts**: Users, channels, messages
+- **Top Channels**: Most active channels by message count
+- **Daily Trends**: Message activity over last 7 days
+- **User Engagement**: Active users, messages per day
 
-### Key Metrics
-
-- HTTP request latency (P95, P99)
-- Kafka consumer lag
-- WebSocket connections
-- Database connection pool usage
-- Redis memory usage
-- Error rates by service
+### Superadmin Features
+- **Hidden from Users**: Not visible in DM lists or searches
+- **Full System Access**: Complete administrative control
+- **Separate Dashboard**: Dedicated admin interface
+- **Auto-redirect**: Admins redirected to `/admin` on login
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+We welcome contributions! Here's how to get started:
 
 ### Development Workflow
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. **Fork the repository**
+2. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. **Make your changes**
+4. **Test your changes**:
+   ```bash
+   npm test  # Frontend
+   pytest    # Backend
+   ```
+5. **Commit your changes**:
+   ```bash
+   git commit -m 'feat: add amazing feature'
+   ```
+6. **Push to your fork**:
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+7. **Open a Pull Request**
 
 ### Code Style
 
-- **Python**: PEP 8, formatted with Black
+- **Frontend**: ESLint, Prettier
+- **Backend**: PEP 8, Black, isort
 - **Commit Messages**: Conventional Commits format
-- **Tests**: Required for all new features
+  - `feat:` New features
+  - `fix:` Bug fixes
+  - `docs:` Documentation changes
+  - `refactor:` Code refactoring
+  - `test:` Test additions/changes
 
 ---
 
-## 📝 License
+## 📝 Documentation
+
+### Complete Documentation
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture overview
+- **[QUICKSTART.md](./QUICKSTART.md)** - Detailed quick start guide
+- **[SUPERADMIN_SETUP.md](./SUPERADMIN_SETUP.md)** - Superadmin setup instructions
+- **[RECENT_CHANGES.md](./RECENT_CHANGES.md)** - Recent updates and changes
+- **[scripts/README.md](./scripts/README.md)** - Scripts documentation
+
+### Additional Resources
+
+- **Architecture Docs**: See `docs/architecture/` for detailed architecture documentation
+- **API Schemas**: OpenAPI/Swagger documentation at service `/docs` endpoints
+- **Diagrams**: System diagrams in `docs/diagrams/`
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Completed (Phase 1-3)
+- ✅ Microservices architecture
+- ✅ Frontend with Next.js 16
+- ✅ Real-time messaging with WebSocket
+- ✅ Authentication with Keycloak
+- ✅ Channels and direct messages
+- ✅ File upload and storage
+- ✅ Admin dashboard
+- ✅ Analytics dashboard
+- ✅ Notifications system
+- ✅ Monitoring with Grafana/Prometheus
+
+### 🚧 In Progress (Phase 4)
+- ⏳ Full-text search with OpenSearch
+- ⏳ Advanced moderation tools
+- ⏳ Enhanced analytics
+- ⏳ Mobile-responsive improvements
+
+### 📋 Planned (Phase 5)
+- 📋 Mobile applications (React Native)
+- 📋 Voice/video calls (WebRTC)
+- 📋 Screen sharing
+- 📋 Advanced search filters
+- 📋 Email notifications
+- 📋 Slack import/export
+- 📋 Custom emoji
+- 📋 Bot framework
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Services not starting:**
+```bash
+# Check Docker is running
+docker version
+
+# Check for port conflicts
+lsof -i :3000  # Frontend port
+lsof -i :8080  # Keycloak port
+
+# Restart services
+docker-compose restart
+```
+
+**Superadmin can't login:**
+```bash
+# Re-run superadmin setup
+docker exec colink-auth-proxy python /app/scripts/setup_superadmin.py
+
+# Check logs
+docker logs colink-auth-proxy
+docker logs colink-keycloak
+```
+
+**Frontend not loading:**
+```bash
+# Rebuild frontend
+docker-compose build frontend
+docker-compose up -d frontend
+
+# Check logs
+docker logs colink-frontend
+
+# Hard refresh browser (Cmd+Shift+R or Ctrl+Shift+R)
+```
+
+**Database connection errors:**
+```bash
+# Check PostgreSQL is running
+docker exec colink-postgres pg_isready
+
+# Check database logs
+docker logs colink-postgres
+
+# Restart database
+docker-compose restart postgres
+```
+
+---
+
+## 📧 Support
+
+- **GitHub Issues**: [Create an issue](https://github.com/darshlukkad/colink-slack-clone/issues)
+- **Documentation**: See `docs/` directory
+- **Email**: Contact repository owner
+
+---
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
@@ -293,56 +614,23 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 
 ## 👥 Team
 
-- **Tech Lead**: Darsh Lukkad ([@darshlukkad](https://github.com/darshlukkad))
-- **Architecture**: [See ARCHITECTURE.md](./ARCHITECTURE.md)
-
----
-
-## 📧 Contact
-
-- **GitHub**: [@darshlukkad](https://github.com/darshlukkad)
-- **Repository**: [colink-slack-clone](https://github.com/darshlukkad/colink-slack-clone)
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1 (Current) - Architecture & Documentation
-- ✅ Complete architecture design
-- ✅ Service contracts (OpenAPI 3.1)
-- ✅ Data model design
-- ✅ Event schemas (Kafka)
-
-### Phase 2 - Core Services
-- ⏳ Auth & Users services
-- ⏳ Channels & Messaging
-- ⏳ Real-time gateway (WebSocket)
-
-### Phase 3 - Extended Features
-- ⏳ Threads & Reactions
-- ⏳ File upload & virus scanning
-- ⏳ Full-text search
-
-### Phase 4 - Admin & Moderation
-- ⏳ Admin dashboard
-- ⏳ Audit logging
-- ⏳ User management
-
-### Phase 5 - Frontend
-- ⏳ React/Next.js web application
-- ⏳ WebSocket client
-- ⏳ UI/UX design
+- **Lead Developer**: Darsh Lukkad ([@darshlukkad](https://github.com/darshlukkad))
+- **Contributors**: See [CONTRIBUTORS.md](./CONTRIBUTORS.md)
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern web framework
+- [Next.js](https://nextjs.org/) - React framework
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
 - [Keycloak](https://www.keycloak.org/) - Identity and access management
 - [PostgreSQL](https://www.postgresql.org/) - Reliable database
 - [Redpanda](https://redpanda.com/) - Kafka-compatible streaming
 - [OpenSearch](https://opensearch.org/) - Search and analytics
+- [TailwindCSS](https://tailwindcss.com/) - Utility-first CSS framework
 
 ---
 
-**Built with ❤️ using FastAPI, PostgreSQL, and Kafka**
+**Built with ❤️ using Next.js, FastAPI, PostgreSQL, and Kafka**
+
+*Last Updated: December 2025*

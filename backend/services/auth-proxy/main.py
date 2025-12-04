@@ -12,7 +12,7 @@ from shared.database import close_db, init_db
 
 from .config import settings
 from .middleware import auth_middleware
-from .routers import auth, health
+from .routers import admin, auth, health
 from prometheus_fastapi_instrumentator import Instrumentator
 
 # Configure logging
@@ -68,6 +68,7 @@ app.middleware("http")(auth_middleware)
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(admin.router, prefix="/auth", tags=["admin"])
 
 
 @app.exception_handler(Exception)

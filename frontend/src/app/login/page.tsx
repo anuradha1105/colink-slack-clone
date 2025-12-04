@@ -11,15 +11,20 @@ export default function LoginPage() {
   const { isAuthenticated, isLoading } = useAuthStore();
 
   useEffect(() => {
+    console.log('Login page - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
     if (isAuthenticated) {
       router.push('/channels');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLogin = () => {
-    window.location.href = AuthService.getAuthUrl();
+    const authUrl = AuthService.getAuthUrl();
+    console.log('Redirecting to:', authUrl);
+    window.location.href = authUrl;
   };
 
+  // Don't block on loading for too long - show login after 2 seconds anyway
+  // This prevents infinite loading states
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -51,17 +56,6 @@ export default function LoginPage() {
 
           <div className="text-center text-sm text-gray-500 mt-4">
             <p>Secure authentication powered by Keycloak</p>
-          </div>
-        </div>
-
-        <div className="mt-8 pt-8 border-t border-gray-200">
-          <div className="text-center space-y-2">
-            <p className="text-sm text-gray-600 font-medium">Demo Accounts</p>
-            <div className="space-y-1 text-xs text-gray-500">
-              <p>alice / password</p>
-              <p>bob / password</p>
-              <p>charlie / password</p>
-            </div>
           </div>
         </div>
       </div>

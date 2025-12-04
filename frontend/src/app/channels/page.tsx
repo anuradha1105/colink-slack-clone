@@ -13,14 +13,18 @@ export default function ChannelsPage() {
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ['channels'],
     queryFn: async () => {
-      return await channelApi.get<Channel[]>('/channels');
+      const response = await channelApi.get<{ channels: Channel[] }>('/channels');
+      return response?.channels || [];
     },
   });
 
   useEffect(() => {
     if (!isLoading && channels.length > 0) {
-      // Redirect to first available channel
-      router.push(`/channels/${channels[0].id}`);
+      // Redirect to first PUBLIC channel, not DMs
+      const publicChannel = channels.find(c => c.channel_type === 'PUBLIC');
+      if (publicChannel) {
+        router.push(`/channels/${publicChannel.id}`);
+      }
     }
   }, [channels, isLoading, router]);
 
