@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { channelApi, messageApi } from '@/lib/api';
-import { Channel, Message } from '@/types';
+import { Channel, Message, User } from '@/types';
 import { ChannelHeader } from '@/components/ChannelHeader';
 import { MessageList } from '@/components/MessageList';
 import { MessageInput } from '@/components/MessageInput';
@@ -11,6 +11,7 @@ import { TypingIndicator } from '@/components/TypingIndicator';
 import { ThreadPanel } from '@/components/ThreadPanel';
 import { useWebSocket } from '@/contexts/WebSocketContext';
 import { useAuthStore } from '@/store/authStore';
+
 
 interface ChannelPageProps {
   params: Promise<{
@@ -50,17 +51,41 @@ export default function ChannelPage({ params }: ChannelPageProps) {
 
         // Unwrap the messages array and map flat author fields to author object
         if (Array.isArray(data.messages)) {
-          const messagesWithAuthor = data.messages.map(msg => ({
-            ...msg,
-            author: {
-              id: msg.author_id,
-              username: msg.author_username || '',
-              display_name: msg.author_display_name,
-              email: '',
-              status: 'ACTIVE' as const,
-              role: 'MEMBER' as const,
-            }
-          }));
+          // const messagesWithAuthor = data.messages.map(msg => ({
+          //   ...msg,
+          //   author: {
+          //     id: msg.author_id,
+          //     username: msg.author_username || '',
+          //     display_name: msg.author_display_name,
+          //     email: '',
+          //     status: 'ACTIVE' as const,
+          //     role: 'MEMBER' as const,
+          //   }
+          // }));
+
+         const messagesWithAuthor: Message[] = (data.messages ?? []).map((m) => {
+           const raw = m as any; // backend DTO with extra author_* fields
+
+          const author: User = {
+            id: raw.author_id ?? raw.author?.id ?? '',
+            username: raw.author_username ?? raw.author?.username ?? '',
+            display_name: raw.author_display_name ?? raw.author?.display_name,
+            email: raw.author_email ?? raw.author?.email ?? '',
+            status: raw.author_status ?? raw.author?.status ?? 'ACTIVE',
+            role: raw.author_role ?? raw.author?.role ?? 'MEMBER',
+            keycloak_id:
+              raw.author_keycloak_id ??
+              raw.author?.keycloak_id ??
+              raw.author_id ??
+              '',
+          };
+
+          return {
+            ...raw,
+            author,
+          } as Message;
+        });
+
           // Reverse to show oldest first (messages come from API in desc order)
           const reversed = messagesWithAuthor.reverse();
           console.log(`[MESSAGES QUERY] Returning ${reversed.length} messages (reversed):`, reversed.map(m => ({ id: m.id, content: m.content.substring(0, 20), reply_count: m.reply_count })));
@@ -96,17 +121,43 @@ export default function ChannelPage({ params }: ChannelPageProps) {
       setHasMore(data.has_more || false);
 
       if (Array.isArray(data.messages) && data.messages.length > 0) {
-        const messagesWithAuthor = data.messages.map(msg => ({
-          ...msg,
-          author: {
-            id: msg.author_id,
-            username: msg.author_username || '',
-            display_name: msg.author_display_name,
-            email: '',
-            status: 'ACTIVE' as const,
-            role: 'MEMBER' as const,
-          }
-        }));
+        // const messagesWithAuthor = data.messages.map(msg => ({
+        //   ...msg,
+        //   author: {
+        //     id: msg.author_id,
+        //     username: msg.author_username || '',
+        //     display_name: msg.author_display_name,
+        //     email: '',
+        //     status: 'ACTIVE' as const,
+        //     role: 'MEMBER' as const,
+        //   }
+        // }));
+
+
+         const messagesWithAuthor: Message[] = (data.messages ?? []).map((m) => {
+           const raw = m as any; // backend DTO with extra author_* fields
+
+          const author: User = {
+            id: raw.author_id ?? raw.author?.id ?? '',
+            username: raw.author_username ?? raw.author?.username ?? '',
+            display_name: raw.author_display_name ?? raw.author?.display_name,
+            email: raw.author_email ?? raw.author?.email ?? '',
+            status: raw.author_status ?? raw.author?.status ?? 'ACTIVE',
+            role: raw.author_role ?? raw.author?.role ?? 'MEMBER',
+            keycloak_id:
+              raw.author_keycloak_id ??
+              raw.author?.keycloak_id ??
+              raw.author_id ??
+              '',
+          };
+
+          return {
+            ...raw,
+            author,
+          } as Message;
+        });
+
+
 
         // Reverse and prepend to existing messages
         const reversed = messagesWithAuthor.reverse();

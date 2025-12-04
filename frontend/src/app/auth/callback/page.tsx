@@ -30,14 +30,33 @@ function AuthCallbackContent() {
         // Exchange code for tokens
         const tokens = await AuthService.exchangeCodeForToken(code);
 
-        // Get user info
-        const user = await AuthService.getCurrentUser(tokens.access_token);
+        // // Get user info
+        // const user = await AuthService.getCurrentUser(tokens.access_token);
 
-        // Save to store and localStorage
-        setAuth(user, tokens);
+        // // Save to store and localStorage
+        // setAuth(user, tokens);
 
         // Redirect to channels
         router.push('/channels');
+        // Get user info
+        const user = await AuthService.getCurrentUser(tokens.access_token);
+          if (!user) {
+            console.error('No user returned from AuthService');
+  // You can redirect to login or show an error instead of continuing
+            router.push('/login');
+            return;
+        }
+
+// Save to store and localStorage
+setAuth(user, tokens);
+
+// Redirect to channels
+router.push('/channels');
+
+
+        
+
+
       } catch (err) {
         console.error('Auth callback error:', err);
         setError('Failed to complete authentication');

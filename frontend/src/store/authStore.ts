@@ -9,7 +9,7 @@ interface AuthState {
   isLoading: boolean;
 
   // Actions
-  setAuth: (user: User, tokens: AuthTokens) => void;
+  setAuth: (user: User | null, tokens: AuthTokens | null) => void;
   setUser: (user: User) => void;
   clearAuth: () => void;
   initializeAuth: () => Promise<void>;
@@ -23,10 +23,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true,
 
+  // Allow null so we can do setAuth(null, null)
   setAuth: (user, tokens) => {
-    AuthService.saveUser(user);
-    AuthService.saveTokens(tokens);
-    set({ user, tokens, isAuthenticated: true, isLoading: false });
+    if (user && tokens) {
+      AuthService.saveUser(user);
+      AuthService.saveTokens(tokens);
+
+      set({
+        user,
+        tokens,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } else {
+      AuthService.clearAuth();
+
+      set({
+        user: null,
+        tokens: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+    }
   },
 
   setUser: (user) => {
@@ -36,7 +54,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearAuth: () => {
     AuthService.clearAuth();
-    set({ user: null, tokens: null, isAuthenticated: false, isLoading: false });
+    set({
+      user: null,
+      tokens: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
   },
 
   initializeAuth: async () => {
@@ -51,14 +74,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Check if token is expired
       if (AuthService.isTokenExpired(tokens.access_token)) {
-        // Try to refresh
         try {
           await get().refreshTokens();
         } catch (error) {
+          console.error('Failed to refresh tokens on init:', error);
           get().clearAuth();
         }
       } else {
-        set({ user, tokens, isAuthenticated: true, isLoading: false });
+        set({
+          user,
+          tokens,
+          isAuthenticated: true,
+          isLoading: false,
+        });
       }
     } catch (error) {
       console.error('Failed to initialize auth:', error);
@@ -66,16 +94,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  // 🛠 Uses AuthService.refreshToken(refresh_token: string)
   refreshTokens: async () => {
-    const { tokens } = get();
-    if (!tokens?.refresh_token) {
-      throw new Error('No refresh token available');
+    try {
+      const { tokens } = get();
+
+      if (!tokens?.refresh_token) {
+        throw new Error('No refresh token available');
+      }
+
+      // Call the singular refreshToken method on AuthService
+      const newTokens = await AuthService.refreshToken(tokens.refresh_token);
+
+      const user = await AuthService.getCurrentUser(newTokens.access_token);
+
+      if (!user) {
+        // If backend can't resolve a user, treat as logged out
+        await AuthService.logout(tokens.refresh_token);
+        get().setAuth(null, null);
+        return;
+      }
+
+      get().setAuth(user, newTokens);
+    } catch (error) {
+      console.error('Failed to refresh tokens:', error);
+      get().setAuth(null, null);
     }
-
-    const newTokens = await AuthService.refreshToken(tokens.refresh_token);
-    const user = await AuthService.getCurrentUser(newTokens.access_token);
-
-    get().setAuth(user, newTokens);
   },
 
   logout: async () => {

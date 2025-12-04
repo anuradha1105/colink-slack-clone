@@ -74,10 +74,10 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       return;
     }
 
-    console.log('🚀 Connecting to WebSocket:', config.websocket.url);
+    console.log('🚀 Connecting to WebSocket:', config.websocketUrl);
 
     // Create socket connection
-    const newSocket = io(config.websocket.url, {
+    const newSocket = io(config.websocketUrl, {
       auth: {
         token: tokens.access_token,
       },
@@ -94,7 +94,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
       setIsConnected(true);
 
       // Fetch initial list of online users
-      fetch(`${config.websocket.url}/online-users`)
+      fetch(`${config.websocketUrl}/online-users`)
         .then(res => res.json())
         .then(data => {
           setOnlineUsers(new Set(data.online_users));
