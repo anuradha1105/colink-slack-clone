@@ -2,7 +2,7 @@
 
 ## 📋 Documentation Index
 
-This is the **master index** for all Colink backend architecture documentation. All detailed specifications are in the [`/docs`](./docs/) folder.
+This is the **master index** for all Colink architecture documentation. All detailed specifications are in the [`/docs`](./docs/) folder.
 
 ---
 
@@ -15,7 +15,6 @@ This is the **master index** for all Colink backend architecture documentation. 
 2. **Need to implement a feature?** Check:
    - [Service Inventory](./docs/architecture/05-service-inventory.md) - Find the right service
    - [Data Flows](./docs/architecture/02-data-flows.md) - See how features work end-to-end
-   - [API Specs](./docs/api-specs/) - View OpenAPI contracts
 
 3. **Security review?** See:
    - [Security Model](./docs/architecture/03-security-model.md)
@@ -33,73 +32,16 @@ This is the **master index** for all Colink backend architecture documentation. 
 |----------|-------------|--------|
 | [00-executive-summary.md](./docs/architecture/00-executive-summary.md) | Technology stack, design decisions, trade-offs | ✅ Complete |
 | [01-system-architecture.md](./docs/architecture/01-system-architecture.md) | C4 diagrams (Context & Container), deployment topology | ✅ Complete |
-| [02-data-flows.md](./docs/architecture/02-data-flows.md) | Sequence diagrams for 9 core user journeys | ✅ Complete |
+| [02-data-flows.md](./docs/architecture/02-data-flows.md) | Sequence diagrams for core user journeys | ✅ Complete |
 | [03-security-model.md](./docs/architecture/03-security-model.md) | Authentication, authorization, RBAC, secrets management | ✅ Complete |
 | [04-scalability-reliability.md](./docs/architecture/04-scalability-reliability.md) | Scaling patterns, caching, retries, circuit breakers | ✅ Complete |
-| [05-service-inventory.md](./docs/architecture/05-service-inventory.md) | Detailed catalog of all 12 services | ✅ Complete |
-| 06-realtime-transport.md | WebSocket architecture, pub/sub, fan-out | 📝 Planned |
-| 07-search.md | OpenSearch indexing, mappings, queries | 📝 Planned |
-| 08-file-handling.md | Presigned URLs, virus scanning, thumbnails | 📝 Planned |
+| [05-service-inventory.md](./docs/architecture/05-service-inventory.md) | Detailed catalog of all services | ✅ Complete |
 
 ### Diagrams
 
 | Diagram | Type | Status |
 |---------|------|--------|
 | [c4-context.md](./docs/diagrams/c4-context.md) | C4 Level 1 (System Context) | ✅ Complete |
-| c4-container.md | C4 Level 2 (Containers) | 📝 In architecture/01 |
-| erd.md | Entity Relationship Diagram | 📝 Planned |
-
-### API Specifications (OpenAPI 3.1)
-
-All service API contracts are defined inline in the original architecture blueprint. Key endpoints:
-
-| Service | Key Endpoints | Documentation |
-|---------|---------------|---------------|
-| Auth Proxy | `/auth/login`, `/auth/refresh`, `/auth/logout` | [Service Inventory](./docs/architecture/05-service-inventory.md#2-auth-proxy) |
-| Users | `/v1/users/me`, `/v1/users/{id}` | [Service Inventory](./docs/architecture/05-service-inventory.md#3-users-service) |
-| Channels | `/v1/channels`, `/v1/channels/{id}/members` | [Service Inventory](./docs/architecture/05-service-inventory.md#4-channels-service) |
-| Messaging | `/v1/messages` (GET/POST/PATCH/DELETE) | [Service Inventory](./docs/architecture/05-service-inventory.md#5-messaging-service) |
-| Threads | `/v1/threads`, `/v1/threads/{id}/replies` | [Service Inventory](./docs/architecture/05-service-inventory.md#6-threads-service) |
-| Reactions | `/v1/messages/{id}/reactions` | [Service Inventory](./docs/architecture/05-service-inventory.md#7-reactions-service) |
-| Presence | `/v1/presence`, `/v1/presence/typing` | [Service Inventory](./docs/architecture/05-service-inventory.md#8-presence-service) |
-| Files | `/v1/files/upload-url`, `/v1/files/{id}/download-url` | [Service Inventory](./docs/architecture/05-service-inventory.md#9-files-service) |
-| Search | `/v1/search/messages`, `/v1/search/files` | [Service Inventory](./docs/architecture/05-service-inventory.md#10-search-service) |
-| Admin | `/v1/admin/users/{id}/deactivate` | [Service Inventory](./docs/architecture/05-service-inventory.md#11-admin-service) |
-
-> **Note**: Full OpenAPI 3.1 YAML specs were provided in the initial architecture blueprint and can be extracted to separate files when needed for code generation.
-
-### Data Model
-
-All database schemas, Redis patterns, and storage configurations are documented inline:
-
-| Component | Documentation | Location |
-|-----------|---------------|----------|
-| **PostgreSQL Schemas** | Complete DDL for each service | [Service Inventory](./docs/architecture/05-service-inventory.md) - See each service section |
-| **Redis Keys** | Cache patterns and TTLs | [Scalability](./docs/architecture/04-scalability-reliability.md#3-caching-strategy) |
-| **Object Storage** | MinIO/S3 bucket structure | [Data Flows](./docs/architecture/02-data-flows.md#4-upload-file--attach-to-message) |
-
-### Event Schemas
-
-All Kafka event contracts are documented with JSON examples:
-
-| Event Type | Documentation | Location |
-|-----------|---------------|----------|
-| **Kafka Topics** | Topic taxonomy, partitioning, retention | [Scalability](./docs/architecture/04-scalability-reliability.md#4-kafka-partitioning) |
-| **Message Events** | `message.created`, `message.updated`, `message.deleted` | [Data Flows](./docs/architecture/02-data-flows.md#data-flow-summary) |
-| **User Events** | `user.created`, `user.updated`, `user.deactivated` | [Data Flows](./docs/architecture/02-data-flows.md) |
-| **Channel Events** | `channel.created`, `member.joined`, etc. | [Data Flows](./docs/architecture/02-data-flows.md#3-create-channel--post-message) |
-| **Presence Events** | `presence.updated`, `typing.started` | [Data Flows](./docs/architecture/02-data-flows.md#6-presence-update--typing-indicators) |
-| **File Events** | `file.uploaded`, `file.scanned` | [Data Flows](./docs/architecture/02-data-flows.md#4-upload-file--attach-to-message) |
-
-### Security
-
-All security configurations and patterns are documented:
-
-| Component | Documentation | Location |
-|-----------|---------------|----------|
-| **Keycloak Setup** | Realm config, clients, 2FA | [Security Model](./docs/architecture/03-security-model.md#keycloak-integration) |
-| **JWT Validation** | Token verification code examples | [Security Model](./docs/architecture/03-security-model.md#jwt-validation) |
-| **RBAC Model** | Role hierarchy and enforcement | [Security Model](./docs/architecture/03-security-model.md#authorization-rbac) |
 
 ---
 
@@ -109,99 +51,233 @@ All security configurations and patterns are documented:
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| **Runtime** | Python | 3.12 |
-| **Framework** | FastAPI | 0.109+ |
-| **ASGI Server** | Uvicorn | 0.27+ |
+| **Frontend** | Next.js | 16 |
+| **Backend Runtime** | Python | 3.11 |
+| **Framework** | FastAPI | 0.115+ |
+| **ASGI Server** | Uvicorn | Latest |
 | **Database** | PostgreSQL | 16 |
 | **Cache** | Redis | 7 |
 | **Message Queue** | Redpanda (Kafka-compatible) | Latest |
 | **Object Storage** | MinIO / S3 | Latest |
 | **Search Engine** | OpenSearch | 2.x |
 | **Identity Provider** | Keycloak | 23.x |
-| **API Gateway** | Traefik | 3.x |
+| **Monitoring** | Prometheus + Grafana | Latest |
 
 ### Design Principles
 
-1. **API-First**: OpenAPI 3.1 specs define all service contracts
-2. **Stateless Services**: All state in Postgres/Redis, not in-memory
-3. **Idempotent Operations**: Idempotency keys prevent duplicate processing
-4. **Eventual Consistency**: Async updates via Kafka for non-critical paths
+1. **API-First**: RESTful APIs with clear contracts
+2. **Microservices**: Independently deployable services with clear boundaries
+3. **Stateless Services**: All state in PostgreSQL/Redis, not in-memory
+4. **Event-Driven**: Async updates via Redpanda/Kafka for non-critical paths
 5. **Security by Default**: JWT validation on every request, RBAC enforcement
 6. **Observable**: Structured logs, distributed tracing, Prometheus metrics
 
-### Microservices (12 Total)
+---
+
+## 🎯 System Components
+
+### Frontend Application
+
+| Component | Port | Technology | Responsibilities |
+|-----------|------|-----------|-----------------|
+| **Web App** | 3000 | Next.js 16, React, TypeScript | User interface, real-time updates, WebSocket client |
+
+**Key Features**:
+- Server-side rendering (SSR) and static generation
+- Real-time messaging with WebSocket
+- File upload with drag-and-drop
+- Responsive design (mobile, tablet, desktop)
+- Dark mode theme support
+- Admin dashboard and analytics
+
+---
+
+### Backend Microservices (9 Services)
 
 | Service | Port | Responsibilities |
 |---------|------|-----------------|
-| **api-gateway** (Traefik) | 80/443 | Routing, TLS termination, rate limiting |
-| **auth-proxy** | 8001 | Keycloak integration, JWT validation |
-| **users-service** | 8002 | User profiles, settings, avatars |
-| **channels-service** | 8003 | Channel CRUD, membership management |
-| **messaging-service** | 8004 | Send/edit/delete messages, DMs |
-| **threads-service** | 8005 | Threaded conversations |
-| **reactions-service** | 8006 | Emoji reactions |
-| **presence-service** | 8007 | Online status, typing indicators |
-| **files-service** | 8008 | File upload/download, virus scanning |
-| **search-service** | 8009 | Full-text search (messages, files, users) |
-| **admin-service** | 8010 | Moderation, audit logging |
-| **realtime-gateway** | 8011 | WebSocket connections, event fan-out |
+| **auth-proxy** | 8001 | Keycloak integration, token management, user auth endpoints |
+| **message-service** | 8002 | Send/edit/delete messages, DMs, analytics endpoints |
+| **channel-service** | 8003 | Channel CRUD, membership management, permissions |
+| **threads-service** | 8005 | Threaded conversations, replies |
+| **reactions-service** | 8006 | Emoji reactions on messages |
+| **files-service** | 8007 | File upload/download, presigned URLs, MinIO integration |
+| **notifications-service** | 8008 | Push notifications, email notifications, user preferences |
+| **websocket-service** | 8009 | WebSocket connections, real-time event fan-out, presence |
+| **admin-service** | 8010 | User management, moderation, audit logging, analytics |
 
 ---
 
-## 🔐 Security Highlights
+### Infrastructure Components
 
-- **Authentication**: OAuth 2.0 / OIDC via Keycloak
-- **2FA**: Mandatory TOTP (Google Authenticator) or WebAuthn (YubiKey)
-- **Authorization**: Role-based (admin, moderator, member, guest)
-- **Tokens**: JWT (1-hour access, 30-day refresh)
-- **Secrets**: Environment variables (dev), Kubernetes Secrets (prod)
-- **Rate Limiting**: 100 req/min per IP, 1000 req/min per user
-- **File Scanning**: ClamAV virus scanning before file delivery
+| Component | Port(s) | Purpose |
+|-----------|---------|---------|
+| **PostgreSQL** | 5432 | Primary database for all services |
+| **Redis** | 6379 | Cache, session store, pub/sub backplane |
+| **Redpanda** | 9092, 9644 | Event streaming (Kafka-compatible) |
+| **Keycloak** | 8080 | Identity provider, OAuth 2.0 / OIDC |
+| **MinIO** | 9000, 9001 | S3-compatible object storage |
+| **OpenSearch** | 9200, 9600 | Full-text search engine |
+| **Prometheus** | 9090 | Metrics collection and storage |
+| **Grafana** | 3001 | Metrics visualization and dashboards |
 
 ---
 
-## 📊 Data Stores
+## 🔐 Security Model
 
-### PostgreSQL (Primary Data Store)
+### Authentication Flow
 
-**Tables**: `users`, `user_settings`, `channels`, `channel_members`, `messages`, `threads`, `reactions`, `files`, `message_files`, `audit_logs`, `sessions`
+```
+User → Frontend → Auth Proxy → Keycloak
+                       ↓
+                  JWT tokens
+                       ↓
+                  Frontend storage
+                       ↓
+              Backend API requests
+```
 
-**Scaling**:
-- Read replicas for query distribution
-- Connection pooling via PgBouncer
-- Future: Table partitioning for `messages` (by month)
+### Authorization (RBAC)
 
-### Redis (Cache & Ephemeral State)
+**Roles**:
+- **Admin/Superadmin**: Full system access, user management, analytics
+- **Moderator**: Channel moderation, content management
+- **Member**: Standard user access to channels and DMs
+- **Guest**: Limited read-only access
 
-**Use Cases**:
-- User/channel metadata cache (5-min TTL)
-- Presence status (60-sec TTL)
+**Implementation**:
+- JWT tokens include user roles
+- Backend services validate roles on protected endpoints
+- Frontend conditionally renders features based on user role
+
+### Security Features
+
+- **OAuth 2.0 / OIDC**: Standard authentication via Keycloak
+- **JWT Tokens**: Short-lived access tokens (1 hour), refresh tokens (30 days)
+- **Token Refresh**: Automatic token refresh on expiration
+- **Secure Storage**: HttpOnly cookies or localStorage for tokens
+- **CORS**: Configured for frontend domain
+- **Rate Limiting**: Per-user and per-IP rate limits
+
+---
+
+## 📊 Data Architecture
+
+### PostgreSQL Databases
+
+Each service has its own database schema:
+
+**auth-proxy**:
+- `users` - User profiles, roles, keycloak mapping
+- `user_settings` - User preferences
+
+**channel-service**:
+- `channels` - Channel metadata
+- `channel_members` - User-channel relationships
+
+**message-service**:
+- `messages` - All messages (channel and DMs)
+- `message_files` - Message-file relationships
+
+**threads-service**:
+- `threads` - Thread metadata
+- `replies` - Thread replies
+
+**reactions-service**:
+- `reactions` - Emoji reactions on messages
+
+**files-service**:
+- `files` - File metadata, storage keys
+
+**notifications-service**:
+- `notifications` - User notifications
+- `notification_preferences` - User notification settings
+
+**admin-service**:
+- `audit_logs` - System audit trail
+
+### Redis Usage
+
+**Cache Patterns**:
+- User profile cache (5-min TTL)
+- Channel metadata cache (5-min TTL)
+- Online user presence (60-sec TTL)
 - Typing indicators (5-sec TTL)
-- Rate limiting counters
-- WebSocket connection mapping
-- Pub/Sub backplane for real-time events
 
-### Redpanda/Kafka (Event Streaming)
+**Pub/Sub**:
+- WebSocket message fan-out
+- Real-time event broadcasting
 
-**Topics**: `user.events`, `channel.events`, `message.events`, `thread.events`, `reaction.events`, `presence.events`, `file.events`, `audit.events`
+### Redpanda/Kafka Topics
 
-**Partitions**: 3-12 per topic (based on throughput)
-**Retention**: 1-90 days (based on topic)
+| Topic | Purpose | Retention |
+|-------|---------|-----------|
+| `user.events` | User created/updated/deleted | 7 days |
+| `channel.events` | Channel operations | 30 days |
+| `message.events` | Message CRUD operations | 30 days |
+| `thread.events` | Thread operations | 30 days |
+| `reaction.events` | Reaction operations | 7 days |
+| `file.events` | File upload/delete | 30 days |
+| `audit.events` | Admin actions | 90 days |
 
-### MinIO/S3 (Object Storage)
+### MinIO/S3 Buckets
 
-**Buckets**:
-- `colink-files`: Uploaded files (PDFs, images, etc.)
-- `colink-avatars`: User avatars
-- `colink-thumbnails`: Image thumbnails
+| Bucket | Purpose | Access |
+|--------|---------|--------|
+| `colink-files` | User-uploaded files | Presigned URLs (1-hour download) |
+| `colink-avatars` | User avatar images | Presigned URLs |
+| `colink-thumbnails` | Image thumbnails | Presigned URLs |
 
-**Access**: Presigned URLs (5-min upload, 1-hour download)
+---
 
-### OpenSearch (Search Index)
+## 🔄 Data Flow Examples
 
-**Indices**: `messages`, `files`, `users`
+### 1. User Sends Message
 
-**Features**: Full-text search, highlighting, filtering, aggregations
+```
+User types message → Frontend
+                       ↓
+            POST /messages (JWT auth)
+                       ↓
+              Message Service
+                       ↓
+         ┌──────────┬──────────┬──────────┐
+         ↓          ↓          ↓          ↓
+    PostgreSQL  Redpanda   Redis    WebSocket
+    (persist)   (event)   (cache)  (broadcast)
+```
+
+### 2. User Uploads File
+
+```
+User selects file → Frontend requests upload URL
+                          ↓
+                   Files Service
+                          ↓
+                    MinIO presigned URL
+                          ↓
+         Frontend uploads directly to MinIO
+                          ↓
+              Frontend notifies Files Service
+                          ↓
+                   Metadata saved
+                          ↓
+                File ID returned to frontend
+```
+
+### 3. Real-time Updates
+
+```
+Backend event → Redpanda topic
+                      ↓
+            WebSocket Service (consumer)
+                      ↓
+              Redis pub/sub
+                      ↓
+           All WebSocket connections
+                      ↓
+            Connected clients receive update
+```
 
 ---
 
@@ -210,142 +286,165 @@ All security configurations and patterns are documented:
 ### Local Development (Docker Compose)
 
 ```bash
-# Clone repository
-git clone https://github.com/yourorg/colink.git
-cd colink
-
 # Start all services
 docker-compose up -d
 
-# Verify services are running
-docker-compose ps
-
 # View logs
-docker-compose logs -f messaging-service
+docker-compose logs -f [service-name]
+
+# Rebuild specific service
+docker-compose build [service-name]
+
+# Restart specific service
+docker-compose restart [service-name]
 
 # Stop all services
 docker-compose down
+
+# Remove all data
+docker-compose down -v
 ```
 
-**Ports**:
-- API Gateway: http://localhost:80
+**Service Access**:
+- Frontend: http://localhost:3000
+- Backend APIs: http://localhost:800X (see service ports above)
 - Keycloak Admin: http://localhost:8080/admin
 - MinIO Console: http://localhost:9001
-- Kafka UI: http://localhost:8081 (if configured)
+- Grafana: http://localhost:3001
+- Prometheus: http://localhost:9090
 
-### Production (Kubernetes - Optional)
+### Production Considerations
 
-```bash
-# Apply Kubernetes manifests
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/secrets.yaml
-kubectl apply -f k8s/postgres.yaml
-kubectl apply -f k8s/redis.yaml
-kubectl apply -f k8s/kafka.yaml
-kubectl apply -f k8s/services/
+**Scaling**:
+- Horizontal scaling for all backend services
+- Read replicas for PostgreSQL
+- Redis cluster for high availability
+- Redpanda cluster with multiple brokers
+- CDN for static assets and avatars
 
-# Check deployment status
-kubectl -n colink get pods
+**Monitoring**:
+- Prometheus for metrics collection
+- Grafana for visualization
+- Structured logging to centralized store
+- Distributed tracing (future)
 
-# View logs
-kubectl -n colink logs -f deployment/messaging-service
-```
-
----
-
-## 📝 API Example (Creating a Message)
-
-### Request
-
-```http
-POST /v1/messages HTTP/1.1
-Host: api.colink.dev
-Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
-Content-Type: application/json
-Idempotency-Key: 7c9e6679-7425-40de-944b-e07fc1f90ae7
-
-{
-  "channelId": "01HQZ01ABC2DEF3GHI4JKL5MNO",
-  "text": "Hello team! 👋",
-  "fileIds": []
-}
-```
-
-### Response
-
-```http
-HTTP/1.1 201 Created
-Content-Type: application/json
-Location: /v1/messages/01HQZY9STUV1WXY2Z3A4B5C6D7
-
-{
-  "id": "01HQZY9STUV1WXY2Z3A4B5C6D7",
-  "senderId": "01HQZX8PQRS9TUV0WXY1Z2A3B4",
-  "senderUsername": "alice_smith",
-  "senderDisplayName": "Alice Smith",
-  "channelId": "01HQZ01ABC2DEF3GHI4JKL5MNO",
-  "recipientId": null,
-  "threadId": null,
-  "text": "Hello team! 👋",
-  "fileIds": [],
-  "isEdited": false,
-  "isDeleted": false,
-  "createdAt": "2025-01-18T10:30:00Z",
-  "updatedAt": null
-}
-```
-
-### Behind the Scenes
-
-1. **API Gateway** validates rate limit, routes to **messaging-service**
-2. **Messaging Service** validates JWT, checks channel membership
-3. Inserts message into **Postgres** (`messages` table)
-4. Publishes `message.created` event to **Kafka** (`message.events` topic)
-5. Publishes to **Redis** (`realtime:channel:{channelId}`)
-6. **Realtime Gateway** fans out to all connected WebSocket clients
-7. **Search Service** (async) indexes message in **OpenSearch**
+**Security**:
+- TLS/HTTPS for all external traffic
+- Network policies between services
+- Secrets management (environment variables or secrets manager)
+- Regular security updates
 
 ---
 
 ## 📈 Scaling Targets
 
-| Metric | MVP | Scale |
-|--------|-----|-------|
+| Metric | Current MVP | Future Scale |
+|--------|-------------|--------------|
 | Concurrent users | 100-1,000 | 10,000+ |
-| Messages/second | 50 | 1,000 |
-| WebSocket connections | 1,000 | 50,000 |
-| Database size | 10GB | 1TB |
-| File storage | 100GB | 10TB |
+| Messages/second | 50 | 1,000+ |
+| WebSocket connections | 1,000 | 50,000+ |
+| Database size | 10GB | 1TB+ |
+| File storage | 100GB | 10TB+ |
 
 ---
 
 ## 🧪 Testing Strategy
 
-1. **Unit Tests**: FastAPI endpoints with `pytest`
-2. **Integration Tests**: Docker Compose + `pytest` with real Postgres/Redis
-3. **Contract Tests**: OpenAPI spec validation with `schemathesis`
-4. **E2E Tests**: WebSocket + HTTP flows with `playwright`
-5. **Load Tests**: `locust` or `k6` for stress testing
+1. **Unit Tests**: Service-level tests with pytest
+2. **Integration Tests**: API endpoint tests with real database
+3. **E2E Tests**: Full user flow tests (future)
+4. **Load Tests**: Performance testing with k6 or locust (future)
 
 ---
 
-## 📚 Additional Resources
+## 📚 Key Features
 
-- **Keycloak Docs**: https://www.keycloak.org/documentation
-- **FastAPI Docs**: https://fastapi.tiangolo.com/
-- **OpenSearch Docs**: https://opensearch.org/docs/
-- **Kafka Docs**: https://kafka.apache.org/documentation/
-- **PostgreSQL Docs**: https://www.postgresql.org/docs/
+### Core Messaging
+- ✅ Channel-based messaging (public/private)
+- ✅ Direct messages (1-on-1)
+- ✅ Threaded conversations
+- ✅ Emoji reactions
+- ✅ File attachments
+- ✅ Real-time updates via WebSocket
+- ✅ Message editing and deletion
+- ✅ Typing indicators
+- ✅ Online presence
+
+### Admin & Moderation
+- ✅ User management (create, update, deactivate)
+- ✅ Role-based access control
+- ✅ Superadmin mode (hidden from regular users)
+- ✅ Admin dashboard with user list
+- ✅ Avatar management
+- ✅ Audit logging
+
+### Analytics & Monitoring
+- ✅ System analytics dashboard
+- ✅ Message statistics
+- ✅ User activity metrics
+- ✅ Channel engagement tracking
+- ✅ Prometheus metrics
+- ✅ Grafana dashboards
+
+### User Experience
+- ✅ Dark mode / Light mode toggle
+- ✅ Responsive design
+- ✅ Real-time notifications
+- ✅ User avatars
+- ✅ Channel browsing
+- ✅ Member lists
+
+### Infrastructure
+- ✅ Microservices architecture
+- ✅ Docker containerization
+- ✅ PostgreSQL database
+- ✅ Redis caching
+- ✅ Redpanda event streaming
+- ✅ MinIO object storage
+- ✅ Keycloak authentication
+- ✅ OpenSearch infrastructure (search implementation in progress)
+
+---
+
+## 🔮 Future Enhancements
+
+### Planned Features
+- 📝 Full-text search (OpenSearch integration)
+- 📝 Voice/video calls
+- 📝 Screen sharing
+- 📝 Message pinning
+- 📝 Channel announcements
+- 📝 Custom emoji
+- 📝 Webhooks and integrations
+- 📝 Mobile apps (iOS/Android)
+
+### Technical Improvements
+- 📝 Distributed tracing
+- 📝 Advanced caching strategies
+- 📝 Database sharding
+- 📝 CDN integration
+- 📝 CI/CD pipeline
+- 📝 Automated backups
+- 📝 Disaster recovery plan
+
+---
+
+## 📖 Additional Resources
+
+- **FastAPI Documentation**: https://fastapi.tiangolo.com/
+- **Next.js Documentation**: https://nextjs.org/docs
+- **Keycloak Documentation**: https://www.keycloak.org/documentation
+- **PostgreSQL Documentation**: https://www.postgresql.org/docs/
+- **Redis Documentation**: https://redis.io/documentation
+- **Redpanda Documentation**: https://docs.redpanda.com/
+- **MinIO Documentation**: https://min.io/docs/
+- **OpenSearch Documentation**: https://opensearch.org/docs/
 
 ---
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on:
-- Code style (PEP 8, Black formatting)
-- Commit message conventions (Conventional Commits)
-- PR review process
-- Branch naming (`feature/`, `fix/`, `docs/`)
+See the main [README.md](./README.md) for contribution guidelines.
 
 ---
 
@@ -355,14 +454,5 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on:
 
 ---
 
-## 👥 Team Contacts
-
-- **Tech Lead**: [Your Name]
-- **Backend Team**: backend@colink.dev
-- **DevOps**: devops@colink.dev
-- **Security**: security@colink.dev
-
----
-
-**Last Updated**: 2025-01-18
-**Architecture Version**: 1.0.0
+**Last Updated**: 2025-12-04
+**Architecture Version**: 2.0.0
