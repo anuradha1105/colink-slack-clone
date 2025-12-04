@@ -35,8 +35,8 @@ RUN apk add --no-cache wget
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy public assets
-COPY --from=builder /app/public ./public
+# Create public directory (will be empty if source doesn't have one)
+RUN mkdir -p public
 
 # Set the correct permission for prerender cache
 RUN mkdir .next

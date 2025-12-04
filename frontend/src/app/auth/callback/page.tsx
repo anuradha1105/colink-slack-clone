@@ -36,8 +36,12 @@ function AuthCallbackContent() {
         // Save to store and localStorage
         setAuth(user, tokens);
 
-        // Redirect to channels
-        router.push('/channels');
+        // Redirect based on user role (case-insensitive check)
+        if (user.role?.toUpperCase() === 'ADMIN') {
+          router.push('/admin');
+        } else {
+          router.push('/channels');
+        }
       } catch (err) {
         console.error('Auth callback error:', err);
         setError('Failed to complete authentication');

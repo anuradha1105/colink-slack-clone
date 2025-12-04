@@ -55,7 +55,7 @@ export function Sidebar() {
       try {
         const data = await authApi.get<User[]>('/auth/users');
         console.log('📋 Users data from API:', data.length, 'users');
-        console.log('📋 User IDs:', data.map(u => ({ id: u.id, name: u.display_name || u.username })));
+        console.log('📋 User roles:', data.map(u => ({ username: u.username, role: u.role, roleLower: u.role?.toLowerCase() })));
         // Ensure we always return an array
         return Array.isArray(data) ? data : [];
       } catch (error) {
@@ -80,9 +80,14 @@ export function Sidebar() {
   const privateChannels = channels.filter(c => c.channel_type === 'PRIVATE');
   const directMessages = channels.filter(c => c.channel_type === 'DIRECT');
 
-  // Get users excluding current user, prioritize online users, limit to 12
+  // Get users excluding current user and admin users, prioritize online users, limit to 12
   const dmUsers = allUsers
-    .filter(u => u.id !== user?.id)
+    .filter(u => {
+      const isCurrentUser = u.id === user?.id;
+      const isAdmin = u.role?.toLowerCase() === 'admin';
+      console.log(`🔍 Filtering user ${u.username}: currentUser=${isCurrentUser}, isAdmin=${isAdmin}, role=${u.role}`);
+      return !isCurrentUser && !isAdmin;
+    })
     .sort((a, b) => {
       const aOnline = onlineUsers.has(a.keycloak_id);
       const bOnline = onlineUsers.has(b.keycloak_id);
@@ -278,7 +283,9 @@ export function Sidebar() {
               {dmUsers.length === 0 ? (
                 <div className="px-2 py-1 text-sm text-purple-300">No users available</div>
               ) : (
-                dmUsers.map((dmUser) => {
+                <>
+                  {console.log('🎯 DM Users being rendered:', dmUsers.map(u => ({ username: u.username, role: u.role })))}
+                  {dmUsers.map((dmUser) => {
                   // Check if we have an existing DM with this user
                   // DM channel names are in format: dm_<user1_id>_<user2_id>
                   const existingDM = directMessages.find((dm) =>
@@ -326,7 +333,8 @@ export function Sidebar() {
                       ) : null}
                     </button>
                   );
-                })
+                })}
+                </>
               )}
             </div>
           )}

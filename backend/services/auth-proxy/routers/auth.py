@@ -105,13 +105,18 @@ async def login(
         else:
             # Create new user
             # Note: created_at and updated_at will be set by database defaults
+            username = user_info.get("preferred_username", credentials.username)
+
+            # Check if this is the superadmin user
+            role = UserRole.ADMIN if username == "superadmin" else UserRole.MEMBER
+
             user = User(
                 keycloak_id=user_info["sub"],
                 email=user_info.get("email", ""),
-                username=user_info.get("preferred_username", credentials.username),
+                username=username,
                 display_name=user_info.get("name"),
                 status=UserStatus.ACTIVE,
-                role=UserRole.MEMBER,
+                role=role,
                 last_seen_at=datetime.now(timezone.utc).replace(tzinfo=None).replace(tzinfo=None),  # Remove timezone for DB compatibility
             )
             db.add(user)

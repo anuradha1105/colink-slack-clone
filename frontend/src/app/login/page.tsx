@@ -53,17 +53,6 @@ export default function LoginPage() {
             <p>Secure authentication powered by Keycloak</p>
           </div>
         </div>
-
-        <div className="mt-8 pt-8 border-t border-gray-200">
-          <div className="text-center space-y-2">
-            <p className="text-sm text-gray-600 font-medium">Demo Accounts</p>
-            <div className="space-y-1 text-xs text-gray-500">
-              <p>alice / password</p>
-              <p>bob / password</p>
-              <p>charlie / password</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
