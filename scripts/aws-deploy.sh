@@ -33,7 +33,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO_URL="https://github.com/yourorg/colink-slack-clone.git"  # UPDATE THIS
+REPO_URL="https://github.com/darshlukkad/colink-slack-clone.git"
 REPO_BRANCH="main"
 INSTALL_DIR="/opt/colink"
 APP_USER="colink"
@@ -400,45 +400,13 @@ create_superadmin() {
     # Create superadmin using the script
     print_info "Creating superadmin user: $SUPERADMIN_USERNAME"
 
-    docker-compose exec -T auth-proxy python /app/scripts/setup_superadmin.py <<EOF || {
-        print_warning "Superadmin setup script not found or failed. Trying alternative method..."
-
-        # Alternative: Create via Keycloak API
-        docker-compose exec -T auth-proxy bash -c "
-            python -c \"
-import os
-import asyncio
-from sqlalchemy import create_engine, text
-from passlib.hash import bcrypt
-
-async def create_admin():
-    # Database connection
-    db_url = 'postgresql://colink_user:\${POSTGRES_PASSWORD}@postgres:5432/colink_db'
-    engine = create_engine(db_url)
-
-    with engine.connect() as conn:
-        # Check if user exists
-        result = conn.execute(text('SELECT id FROM users WHERE username = :username'), {'username': '$SUPERADMIN_USERNAME'})
-        if result.fetchone():
-            print('Superadmin already exists')
-            return
-
-        # Create user
-        conn.execute(text('''
-            INSERT INTO users (username, email, role, is_active, created_at, updated_at)
-            VALUES (:username, :email, 'admin', true, NOW(), NOW())
-        '''), {
-            'username': '$SUPERADMIN_USERNAME',
-            'email': '$SUPERADMIN_EMAIL'
-        })
-        conn.commit()
-        print('Superadmin created successfully')
-
-asyncio.run(create_admin())
-\"
-        "
-    }
-EOF
+    # Try to create superadmin
+    if docker-compose exec -T auth-proxy python /app/scripts/setup_superadmin.py 2>/dev/null; then
+        print_success "Superadmin created via setup script"
+    else
+        print_warning "Setup script not found. You'll need to create superadmin manually after deployment."
+        print_info "Run: docker-compose exec auth-proxy python /app/scripts/setup_superadmin.py"
+    fi
 
     print_success "Superadmin user created"
     print_info "Username: $SUPERADMIN_USERNAME"
