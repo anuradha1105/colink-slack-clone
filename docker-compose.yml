@@ -105,7 +105,7 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: colink
       KC_DB_PASSWORD: colink_password
-      KC_HOSTNAME: localhost
+      KC_HOSTNAME: ${PUBLIC_IP:-localhost}
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
     command:
@@ -187,6 +187,7 @@ services:
       - DATABASE_URL=postgresql+asyncpg://colink:colink_password@postgres:5432/colink
       - REDIS_URL=redis://redis:6379/0
       - KEYCLOAK_URL=http://keycloak:8080
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -220,6 +221,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - AUTH_PROXY_URL=http://auth-proxy:8001
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -254,7 +256,7 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=colink
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
     depends_on:
       redpanda:
         condition: service_healthy
@@ -286,6 +288,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - AUTH_PROXY_URL=http://auth-proxy:8001
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -321,6 +324,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - AUTH_PROXY_URL=http://auth-proxy:8001
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -358,6 +362,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - AUTH_PROXY_URL=http://auth-proxy:8001
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -436,12 +441,13 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
       - AUTH_PROXY_URL=http://auth-proxy:8001
+      - CORS_ORIGINS=http://${PUBLIC_IP:-localhost}:3000,http://localhost:3000,http://localhost:8080
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=colink
       - MINIO_THUMBNAILS_BUCKET=colink-thumbnails
-      - MINIO_PUBLIC_ENDPOINT=http://localhost:9000
+      - MINIO_PUBLIC_ENDPOINT=http://${PUBLIC_IP:-localhost}:9000
     depends_on:
       postgres:
         condition: service_healthy
@@ -467,6 +473,18 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        - NEXT_PUBLIC_KEYCLOAK_URL=http://${PUBLIC_IP:-localhost}:8080
+        - NEXT_PUBLIC_KEYCLOAK_REALM=colink
+        - NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=web-app
+        - NEXT_PUBLIC_AUTH_PROXY_URL=http://${PUBLIC_IP:-localhost}:8001
+        - NEXT_PUBLIC_CHANNEL_SERVICE_URL=http://${PUBLIC_IP:-localhost}:8003
+        - NEXT_PUBLIC_MESSAGE_SERVICE_URL=http://${PUBLIC_IP:-localhost}:8002
+        - NEXT_PUBLIC_THREADS_SERVICE_URL=http://${PUBLIC_IP:-localhost}:8005
+        - NEXT_PUBLIC_REACTIONS_SERVICE_URL=http://${PUBLIC_IP:-localhost}:8006
+        - NEXT_PUBLIC_FILES_SERVICE_URL=http://${PUBLIC_IP:-localhost}:8007
+        - NEXT_PUBLIC_NOTIFICATIONS_SERVICE_URL=http://${PUBLIC_IP:-localhost}:8008
+        - NEXT_PUBLIC_WEBSOCKET_URL=http://${PUBLIC_IP:-localhost}:8009
     container_name: colink-frontend
     ports:
       - "3000:3000"
@@ -474,8 +492,8 @@ services:
       - NODE_ENV=production
       # Use Docker service names for internal communication
       # These will be accessible from the browser (client-side)
-      - NEXT_PUBLIC_API_URL=http://localhost:8001
-      - NEXT_PUBLIC_WS_URL=http://localhost:8009
+      - NEXT_PUBLIC_API_URL=http://${PUBLIC_IP:-localhost}:8001
+      - NEXT_PUBLIC_WS_URL=http://${PUBLIC_IP:-localhost}:8009
     depends_on:
       auth-proxy:
         condition: service_healthy

@@ -1,33 +1,110 @@
-name: Local Deploy (Docker Compose)
+name: Deploy to EC2
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # let you click "Run workflow" manually
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  EC2_HOST: 43.205.118.54
+  EC2_USER: ec2-user
+  DEPLOY_PATH: /home/ec2-user/colink-slack-clone
 
 jobs:
   deploy:
-    name: Deploy to local machine
-    runs-on: self-hosted
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Go to project directory
+      - name: Configure SSH
         run: |
-          cd /Users/anuradhasrivastav/Documents/GitHub/colink-slack-clone
-          pwd
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/colink.pem
+          chmod 600 ~/.ssh/colink.pem
+          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Docker Compose up
+      - name: Create deployment directory on EC2
         run: |
-          cd /Users/anuradhasrivastav/Documents/GitHub/colink-slack-clone
-          # stop existing containers
-          docker compose down || docker-compose down || echo "No containers running"
-          # start new ones
-          docker compose up -d --build || docker-compose up -d --build
+          ssh -i ~/.ssh/colink.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "mkdir -p ${{ env.DEPLOY_PATH }}"
 
-      - name: Show container status
+      - name: Copy files to EC2
         run: |
-          cd /Users/anuradhasrivastav/Documents/GitHub/colink-slack-clone
-          docker compose ps || docker-compose ps
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '__pycache__' \
+            --exclude '.pytest_cache' \
+            --exclude 'htmlcov' \
+            --exclude '.env.local' \
+            -e "ssh -i ~/.ssh/colink.pem" \
+            ./ ${{ env.EC2_USER }}@${{ env.EC2_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Create .env file on EC2
+        run: |
+          ssh -i ~/.ssh/colink.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'EOF'
+            cd ${{ env.DEPLOY_PATH }}
+            cat > .env << 'ENVFILE'
+          PUBLIC_IP=${{ env.EC2_HOST }}
+          KEYCLOAK_REALM=colink
+          KEYCLOAK_CLIENT_ID=web-app
+          DATABASE_URL=postgresql+asyncpg://colink:colink_password@postgres:5432/colink
+          REDIS_URL=redis://redis:6379/0
+          KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
+          MINIO_ENDPOINT=minio:9000
+          MINIO_ACCESS_KEY=minioadmin
+          MINIO_SECRET_KEY=minioadmin
+          ENVFILE
+          EOF
+
+      - name: Deploy with Docker Compose
+        run: |
+          ssh -i ~/.ssh/colink.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'EOF'
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Stop existing containers
+            docker compose down --remove-orphans || docker-compose down --remove-orphans || echo "No containers running"
+            
+            # Pull latest base images
+            docker compose pull || docker-compose pull || echo "Pull completed"
+            
+            # Build and start containers
+            export PUBLIC_IP=${{ env.EC2_HOST }}
+            docker compose up -d --build || docker-compose up -d --build
+            
+            # Wait for services to start
+            echo "Waiting for services to start..."
+            sleep 30
+            
+            # Show container status
+            docker compose ps || docker-compose ps
+          EOF
+
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/colink.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'EOF'
+            echo "=== Container Status ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            
+            echo ""
+            echo "=== Health Checks ==="
+            
+            # Check frontend
+            curl -sf http://localhost:3000 > /dev/null && echo "✓ Frontend is healthy" || echo "✗ Frontend is not responding"
+            
+            # Check auth-proxy
+            curl -sf http://localhost:8001/health > /dev/null && echo "✓ Auth-proxy is healthy" || echo "✗ Auth-proxy is not responding"
+            
+            # Check message service
+            curl -sf http://localhost:8002/health > /dev/null && echo "✓ Message service is healthy" || echo "✗ Message service is not responding"
+            
+            # Check channel service
+            curl -sf http://localhost:8003/health > /dev/null && echo "✓ Channel service is healthy" || echo "✗ Channel service is not responding"
+          EOF
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/colink.pem
