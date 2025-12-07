@@ -3,6 +3,7 @@
 import base64
 import json
 import logging
+import os
 from typing import Any, Dict
 
 import httpx
@@ -185,12 +186,17 @@ class KeycloakService:
 
             # Validate token is from our realm
             # Accept both localhost and keycloak hostname (for container/local testing)
+            # Also accept PUBLIC_IP for deployed environments
             token_issuer = user_info.get("iss", "")
+            public_ip = os.environ.get("PUBLIC_IP", "")
             valid_issuers = [
                 f"{settings.keycloak_url}/realms/{settings.keycloak_realm}",
                 f"http://localhost:8080/realms/{settings.keycloak_realm}",
                 f"http://keycloak:8080/realms/{settings.keycloak_realm}",
             ]
+            # Add public IP issuer if configured
+            if public_ip:
+                valid_issuers.append(f"http://{public_ip}:8080/realms/{settings.keycloak_realm}")
 
             if not any(token_issuer == issuer for issuer in valid_issuers):
                 logger.warning(f"Invalid token issuer: {token_issuer}, expected one of {valid_issuers}")
