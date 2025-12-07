@@ -91,6 +91,155 @@ jobs:
               docker exec colink-postgres psql -U colink -d colink -c "CREATE DATABASE keycloak;"
             echo "Keycloak database ensured"
             
+            # Create database schema (ENUMs and tables)
+            echo "Setting up database schema..."
+            docker exec colink-postgres psql -U colink -d colink << 'SQLEOF'
+            -- Create ENUM types if they don't exist
+            DO $$ BEGIN
+              CREATE TYPE userstatus AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'DELETED');
+            EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+            
+            DO $$ BEGIN
+              CREATE TYPE userrole AS ENUM ('ADMIN', 'MODERATOR', 'MEMBER', 'GUEST');
+            EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+            
+            DO $$ BEGIN
+              CREATE TYPE messagetype AS ENUM ('TEXT', 'SYSTEM', 'FILE');
+            EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+            
+            -- Create users table
+            CREATE TABLE IF NOT EXISTS users (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              keycloak_id UUID UNIQUE,
+              username VARCHAR(50) UNIQUE NOT NULL,
+              email VARCHAR(255) UNIQUE,
+              display_name VARCHAR(100),
+              avatar_url VARCHAR(512),
+              status userstatus DEFAULT 'ACTIVE',
+              role userrole DEFAULT 'MEMBER',
+              phone_number VARCHAR(20),
+              timezone VARCHAR(50) DEFAULT 'UTC',
+              last_seen_at TIMESTAMP WITH TIME ZONE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Create channels table
+            CREATE TABLE IF NOT EXISTS channels (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name VARCHAR(100) NOT NULL,
+              description TEXT,
+              is_private BOOLEAN DEFAULT false,
+              is_dm BOOLEAN DEFAULT false,
+              created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+              topic VARCHAR(255),
+              channel_type VARCHAR(50) DEFAULT 'public',
+              deleted_at TIMESTAMP WITH TIME ZONE,
+              extra_metadata JSONB DEFAULT '{}',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Create channel_members table
+            CREATE TABLE IF NOT EXISTS channel_members (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+              user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              is_admin BOOLEAN DEFAULT false,
+              notifications_enabled BOOLEAN DEFAULT true,
+              muted_until TIMESTAMP WITH TIME ZONE,
+              last_read_at TIMESTAMP WITH TIME ZONE,
+              left_at TIMESTAMP WITH TIME ZONE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(channel_id, user_id)
+            );
+            
+            -- Create threads table
+            CREATE TABLE IF NOT EXISTS threads (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+              root_message_id UUID,
+              reply_count INTEGER DEFAULT 0,
+              participant_count INTEGER DEFAULT 0,
+              last_reply_at TIMESTAMP WITH TIME ZONE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Create messages table
+            CREATE TABLE IF NOT EXISTS messages (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+              author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+              thread_id UUID REFERENCES threads(id) ON DELETE SET NULL,
+              content TEXT NOT NULL,
+              message_type messagetype DEFAULT 'TEXT',
+              edited_at TIMESTAMP WITH TIME ZONE,
+              deleted_at TIMESTAMP WITH TIME ZONE,
+              extra_metadata JSONB DEFAULT '{}',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Add FK for threads.root_message_id after messages table exists
+            DO $$ BEGIN
+              ALTER TABLE threads ADD CONSTRAINT threads_root_message_id_fkey 
+                FOREIGN KEY (root_message_id) REFERENCES messages(id) ON DELETE CASCADE;
+            EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+            
+            -- Create reactions table
+            CREATE TABLE IF NOT EXISTS reactions (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+              user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              emoji VARCHAR(50) NOT NULL,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(message_id, user_id, emoji)
+            );
+            
+            -- Create files table
+            CREATE TABLE IF NOT EXISTS files (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              uploaded_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+              filename VARCHAR(255) NOT NULL,
+              original_filename VARCHAR(255) NOT NULL,
+              mime_type VARCHAR(255) NOT NULL,
+              size_bytes INTEGER NOT NULL,
+              storage_key VARCHAR(512) UNIQUE NOT NULL,
+              bucket VARCHAR(100) NOT NULL,
+              url VARCHAR(1024),
+              thumbnail_url VARCHAR(1024),
+              scan_status VARCHAR(50) DEFAULT 'pending',
+              scanned_at TIMESTAMP WITH TIME ZONE,
+              deleted_at TIMESTAMP WITH TIME ZONE,
+              extra_metadata JSONB DEFAULT '{}',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            
+            -- Create message_attachments table
+            CREATE TABLE IF NOT EXISTS message_attachments (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+              file_id UUID NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(message_id, file_id)
+            );
+            
+            -- Create indexes
+            CREATE INDEX IF NOT EXISTS ix_users_keycloak_id ON users(keycloak_id);
+            CREATE INDEX IF NOT EXISTS ix_users_username ON users(username);
+            CREATE INDEX IF NOT EXISTS ix_messages_channel_id ON messages(channel_id);
+            CREATE INDEX IF NOT EXISTS ix_messages_author_id ON messages(author_id);
+            CREATE INDEX IF NOT EXISTS ix_messages_thread_id ON messages(thread_id);
+            CREATE INDEX IF NOT EXISTS ix_reactions_message_id ON reactions(message_id);
+            CREATE INDEX IF NOT EXISTS ix_channel_members_channel_id ON channel_members(channel_id);
+            CREATE INDEX IF NOT EXISTS ix_channel_members_user_id ON channel_members(user_id);
+            SQLEOF
+            echo "Database schema created"
+            
             # Start all remaining services
             docker compose up -d --build || docker-compose up -d --build
             
@@ -107,6 +256,120 @@ jobs:
             
             # Show container status
             docker compose ps || docker-compose ps
+          EOF
+
+      - name: Setup Keycloak Realm and Users
+        run: |
+          ssh -i ~/.ssh/colink.pem ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'EOF'
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Wait for Keycloak to be fully ready
+            echo "Waiting for Keycloak to be ready..."
+            for i in {1..60}; do
+              if curl -sf http://localhost:8080/health/ready > /dev/null 2>&1; then
+                echo "Keycloak is ready"
+                break
+              fi
+              echo "Waiting for Keycloak... ($i/60)"
+              sleep 5
+            done
+            
+            # Get Keycloak admin token
+            echo "Getting Keycloak admin token..."
+            ADMIN_TOKEN=$(curl -s -X POST "http://localhost:8080/realms/master/protocol/openid-connect/token" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -d "username=admin" \
+              -d "password=admin" \
+              -d "grant_type=password" \
+              -d "client_id=admin-cli" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+            
+            if [ -z "$ADMIN_TOKEN" ]; then
+              echo "Failed to get admin token, Keycloak may not be ready"
+              exit 0
+            fi
+            
+            # Check if realm exists
+            REALM_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $ADMIN_TOKEN" \
+              "http://localhost:8080/admin/realms/colink")
+            
+            if [ "$REALM_EXISTS" = "200" ]; then
+              echo "Realm 'colink' already exists, skipping setup"
+            else
+              echo "Creating realm 'colink'..."
+              curl -s -X POST "http://localhost:8080/admin/realms" \
+                -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "realm": "colink",
+                  "enabled": true,
+                  "registrationAllowed": true,
+                  "loginWithEmailAllowed": true,
+                  "duplicateEmailsAllowed": false,
+                  "resetPasswordAllowed": true,
+                  "editUsernameAllowed": false,
+                  "bruteForceProtected": true
+                }'
+              echo "Realm created"
+              
+              # Create web-app client
+              echo "Creating web-app client..."
+              curl -s -X POST "http://localhost:8080/admin/realms/colink/clients" \
+                -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "clientId": "web-app",
+                  "enabled": true,
+                  "publicClient": true,
+                  "directAccessGrantsEnabled": true,
+                  "standardFlowEnabled": true,
+                  "implicitFlowEnabled": false,
+                  "redirectUris": ["http://${{ env.EC2_HOST }}:3000/*", "http://localhost:3000/*"],
+                  "webOrigins": ["http://${{ env.EC2_HOST }}:3000", "http://localhost:3000"],
+                  "attributes": {
+                    "pkce.code.challenge.method": "S256"
+                  }
+                }'
+              echo "Client created"
+              
+              # Create superadmin user
+              echo "Creating superadmin user..."
+              curl -s -X POST "http://localhost:8080/admin/realms/colink/users" \
+                -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{
+                  "username": "superadmin",
+                  "email": "superadmin@colink.dev",
+                  "emailVerified": true,
+                  "enabled": true,
+                  "firstName": "Super",
+                  "lastName": "Admin",
+                  "credentials": [{
+                    "type": "password",
+                    "value": "Admin@123",
+                    "temporary": false
+                  }]
+                }'
+              
+              # Get superadmin user ID and set password
+              SUPERADMIN_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+                "http://localhost:8080/admin/realms/colink/users?username=superadmin" | \
+                grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+              
+              if [ -n "$SUPERADMIN_ID" ]; then
+                echo "Superadmin created with ID: $SUPERADMIN_ID"
+                
+                # Insert superadmin into database
+                docker exec colink-postgres psql -U colink -d colink -c "
+                  INSERT INTO users (id, keycloak_id, username, email, display_name, status, role)
+                  VALUES ('$SUPERADMIN_ID', '$SUPERADMIN_ID', 'superadmin', 'superadmin@colink.dev', 'Super Admin', 'ACTIVE', 'ADMIN')
+                  ON CONFLICT (username) DO UPDATE SET role = 'ADMIN', display_name = 'Super Admin';
+                "
+                echo "Superadmin added to database"
+              fi
+              
+              echo "Keycloak setup completed!"
+            fi
           EOF
 
       - name: Health check
