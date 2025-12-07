@@ -204,13 +204,16 @@ async def get_current_user(
         if not user:
             # Auto-create user on first login
             logger.info(f"Creating new user from Keycloak: {user_info.get('preferred_username')}")
+            username = user_info.get("preferred_username", user_info["sub"])
+            # Assign admin role to superadmin user
+            role = UserRole.ADMIN if username == "superadmin" else UserRole.MEMBER
             user = User(
                 keycloak_id=user_info["sub"],
                 email=user_info.get("email", ""),
-                username=user_info.get("preferred_username", user_info["sub"]),
+                username=username,
                 display_name=user_info.get("name", user_info.get("preferred_username", "")),
-                role=user_info.get("role", "user"),
-                status="online",
+                role=role,
+                status=UserStatus.ACTIVE,
             )
             db.add(user)
             await db.commit()
