@@ -6,7 +6,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  EC2_HOST: 43.205.118.54
+  EC2_HOST: ${{ secrets.EC2_HOST }}
   EC2_USER: ec2-user
   DEPLOY_PATH: /home/ec2-user/colink-slack-clone
 
@@ -97,6 +97,13 @@ jobs:
             # Wait for services to be healthy
             echo "Waiting for services to start..."
             sleep 45
+            
+            # Configure MinIO buckets for public access (for avatars/files)
+            echo "Configuring MinIO buckets..."
+            docker exec colink-minio mc alias set myminio http://localhost:9000 minioadmin minioadmin 2>/dev/null || true
+            docker exec colink-minio mc anonymous set download myminio/colink 2>/dev/null || true
+            docker exec colink-minio mc anonymous set download myminio/colink-thumbnails 2>/dev/null || true
+            echo "MinIO buckets configured"
             
             # Show container status
             docker compose ps || docker-compose ps
