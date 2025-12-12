@@ -9,13 +9,14 @@ interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
   onReplyClick?: (message: Message) => void;
+  onSuggestionClick?: (suggestion: string) => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
   searchQuery?: string;
 }
 
-export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoadingMore, onLoadMore, searchQuery }: MessageListProps) {
+export function MessageList({ messages, isLoading, onReplyClick, onSuggestionClick, hasMore, isLoadingMore, onLoadMore, searchQuery }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesStartRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,6 +118,7 @@ export function MessageList({ messages, isLoading, onReplyClick, hasMore, isLoad
               message={message}
               showAvatar={showAvatar}
               onReplyClick={onReplyClick}
+              onSuggestionClick={onSuggestionClick}
               highlightText={searchQuery}
             />
           );

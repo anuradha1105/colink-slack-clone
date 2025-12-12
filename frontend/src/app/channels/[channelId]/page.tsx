@@ -335,6 +335,21 @@ export default function ChannelPage({ params }: ChannelPageProps) {
     return unsubscribe;
   }, [channelId, onReactionRemoved, queryClient, currentUser?.id]);
 
+  // Handle AI suggestion click - send the suggestion as a message
+  const handleSuggestionClick = async (suggestion: string) => {
+    try {
+      await messageApi.post<any>(`/messages`, {
+        content: suggestion,
+        channel_id: channelId,
+        message_type: 'text',
+      });
+      // Refetch messages to show the new message
+      await queryClient.refetchQueries({ queryKey: ['messages', channelId] });
+    } catch (error) {
+      console.error('Failed to send suggestion as message:', error);
+    }
+  };
+
   if (channelLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -361,6 +376,7 @@ export default function ChannelPage({ params }: ChannelPageProps) {
         messages={messages}
         isLoading={messagesLoading}
         onReplyClick={setSelectedThread}
+        onSuggestionClick={handleSuggestionClick}
         hasMore={hasMore}
         isLoadingMore={isLoadingMore}
         onLoadMore={loadMoreMessages}

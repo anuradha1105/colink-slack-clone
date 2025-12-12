@@ -4,25 +4,31 @@ import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Message } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
-import { Smile, MessageSquare, MoreVertical, File, Download, FileText, FileImage, FileVideo, Trash2 } from 'lucide-react';
+import { Smile, MessageSquare, MoreVertical, File, Download, FileText, FileImage, FileVideo, Trash2, Lightbulb, Loader2 } from 'lucide-react';
 import { messageApi, filesApi } from '@/lib/api';
+
+// AI Service URL for smart reply suggestions
+const AI_SERVICE_URL = process.env.NEXT_PUBLIC_AI_SERVICE_URL || 'http://localhost:8011';
 import { AuthService } from '@/lib/auth';
 import { useAuthStore } from '@/store/authStore';
-import { config } from '@/lib/config';
 import { UserProfilePopup } from './UserProfilePopup';
 
 interface MessageItemProps {
   message: Message;
   showAvatar: boolean;
   onReplyClick?: (message: Message) => void;
+  onSuggestionClick?: (suggestion: string) => void;
   highlightText?: string;
 }
 
-export function MessageItem({ message, showAvatar, onReplyClick, highlightText }: MessageItemProps) {
+export function MessageItem({ message, showAvatar, onReplyClick, onSuggestionClick, highlightText }: MessageItemProps) {
   const [showActions, setShowActions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [profilePosition, setProfilePosition] = useState({ x: 0, y: 0 });
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const nameRef = useRef<HTMLSpanElement>(null);
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -112,6 +118,45 @@ export function MessageItem({ message, showAvatar, onReplyClick, highlightText }
     }
   };
 
+  // Handle smart reply suggestions
+  const handleSuggestReplies = async () => {
+    if (!message.content || isLoadingSuggestions) return;
+
+    setIsLoadingSuggestions(true);
+    setSuggestions([]);
+    setShowSuggestions(true);
+
+    try {
+      const response = await fetch(`${AI_SERVICE_URL}/suggest-replies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: message.content }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get suggestions');
+      }
+
+      const data = await response.json();
+      setSuggestions(data.suggestions || []);
+    } catch (error) {
+      console.error('Failed to get reply suggestions:', error);
+      setSuggestions(['Got it!', 'Thanks!', 'I\'ll check it out.']);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleSuggestionSelect = (suggestion: string) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    if (onSuggestionClick) {
+      onSuggestionClick(suggestion);
+    }
+  };
+
   // Function to highlight matching text
   const getHighlightedText = (text: string, highlight?: string) => {
     if (!highlight || !highlight.trim()) {
@@ -158,7 +203,9 @@ export function MessageItem({ message, showAvatar, onReplyClick, highlightText }
       }
 
       // Use filesApi to get the file with authentication
-      const downloadUrl = `${config.api.files}/api/v1/files/${fileId}/download`;
+      // Use the files API base URL (port 8007 for files service)
+      const filesBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(':8001', ':8007') || 'http://localhost:8007';
+      const downloadUrl = `${filesBaseUrl}/api/v1/files/${fileId}/download`;
       console.log('[Download] Fetching from:', downloadUrl);
 
       const response = await fetch(downloadUrl, {
@@ -245,10 +292,10 @@ export function MessageItem({ message, showAvatar, onReplyClick, highlightText }
                 className="font-semibold text-gray-900 hover:underline cursor-pointer"
               >
                 {message.author?.display_name ||
-                 message.author?.username ||
-                 message.author_display_name ||
-                 message.author_username ||
-                 'Unknown User'}
+                  message.author?.username ||
+                  message.author_display_name ||
+                  message.author_username ||
+                  'Unknown User'}
               </span>
               <span className="text-xs text-gray-500">{formattedTime}</span>
               {message.is_edited && (
@@ -258,6 +305,36 @@ export function MessageItem({ message, showAvatar, onReplyClick, highlightText }
           )}
 
           <div className="text-gray-900 break-words">{getHighlightedText(message.content, highlightText)}</div>
+
+          {/* Smart Reply Suggestions */}
+          {showSuggestions && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {isLoadingSuggestions ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating suggestions...</span>
+                </div>
+              ) : (
+                suggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestionSelect(suggestion)}
+                    className="px-3 py-1.5 text-sm bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-full text-gray-700 transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                ))
+              )}
+              {!isLoadingSuggestions && suggestions.length > 0 && (
+                <button
+                  onClick={() => { setShowSuggestions(false); setSuggestions([]); }}
+                  className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Attachments */}
           {message.attachments && message.attachments.length > 0 && (
@@ -305,11 +382,10 @@ export function MessageItem({ message, showAvatar, onReplyClick, highlightText }
                 <button
                   key={reaction.emoji}
                   onClick={() => handleEmojiClick(reaction.emoji, reaction.user_reacted)}
-                  className={`flex items-center space-x-1 px-2 py-1 border rounded-full text-sm transition-colors ${
-                    reaction.user_reacted
-                      ? 'bg-blue-100 border-blue-500 text-blue-700'
-                      : 'bg-white border-gray-300 hover:border-blue-500'
-                  }`}
+                  className={`flex items-center space-x-1 px-2 py-1 border rounded-full text-sm transition-colors ${reaction.user_reacted
+                    ? 'bg-blue-100 border-blue-500 text-blue-700'
+                    : 'bg-white border-gray-300 hover:border-blue-500'
+                    }`}
                   title={reaction.users?.map(u => u.username).join(', ')}
                 >
                   <span>{reaction.emoji}</span>
@@ -379,6 +455,18 @@ export function MessageItem({ message, showAvatar, onReplyClick, highlightText }
               title="Reply in thread"
             >
               <MessageSquare className="h-4 w-4 text-gray-600" />
+            </button>
+            <button
+              onClick={handleSuggestReplies}
+              disabled={isLoadingSuggestions}
+              className="p-1 hover:bg-yellow-100 rounded"
+              title="Smart Reply Suggestions"
+            >
+              {isLoadingSuggestions ? (
+                <Loader2 className="h-4 w-4 text-yellow-600 animate-spin" />
+              ) : (
+                <Lightbulb className="h-4 w-4 text-yellow-600" />
+              )}
             </button>
             {canDelete && (
               <button

@@ -3,12 +3,15 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { channelApi, authApi } from '@/lib/api';
-import { Channel, User } from '@/types';
-import { Hash, Lock, Users, Star, Info, MoreVertical, Trash2, Search, Sun, Moon } from 'lucide-react';
+import { channelApi, authApi, messageApi } from '@/lib/api';
+import { Channel, User, Message } from '@/types';
+import { Hash, Lock, Users, Star, Info, MoreVertical, Trash2, Search, Sun, Moon, FileText, Loader2, X } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeStore } from '@/store/themeStore';
 import { OnlineStatus } from './OnlineStatus';
+
+// AI Service URL
+const AI_SERVICE_URL = process.env.NEXT_PUBLIC_AI_SERVICE_URL || 'http://localhost:8011';
 
 interface ChannelHeaderProps {
   channel: Channel;
@@ -35,6 +38,9 @@ export function ChannelHeader({ channel, onSearch }: ChannelHeaderProps) {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showSearchBox, setShowSearchBox] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summary, setSummary] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   // Fetch channel members
   const { data: membersData } = useQuery({
@@ -46,9 +52,14 @@ export function ChannelHeader({ channel, onSearch }: ChannelHeaderProps) {
     },
   });
 
-  // Get the other user's ID for DM channels
+  // Get the other user's ID for DM channels - compare multiple identifiers
   const otherUserId = isDirect && membersData?.members
-    ? membersData.members.find((member) => member.user_id !== user?.id)?.user_id
+    ? membersData.members.find((member) => {
+        const isCurrentUser = member.user_id === user?.id || 
+                              member.username === user?.username ||
+                              member.display_name === user?.display_name;
+        return !isCurrentUser;
+      })?.user_id
     : null;
 
   // Fetch complete user profile for DM channels
@@ -65,11 +76,14 @@ export function ChannelHeader({ channel, onSearch }: ChannelHeaderProps) {
   const getDisplayName = () => {
     if (!isDirect) return channel.name;
 
-    // Get the other user from members
+    // Get the other user from members - compare multiple identifiers
     if (membersData?.members) {
-      const otherMember = membersData.members.find(
-        (member) => member.user_id !== user?.id
-      );
+      const otherMember = membersData.members.find((member) => {
+        const isCurrentUser = member.user_id === user?.id || 
+                              member.username === user?.username ||
+                              member.display_name === user?.display_name;
+        return !isCurrentUser;
+      });
       if (otherMember) {
         return otherMember.display_name || otherMember.username;
       }
@@ -129,6 +143,71 @@ export function ChannelHeader({ channel, onSearch }: ChannelHeaderProps) {
     setShowSearchBox(false);
   };
 
+  // Handle summarize channel messages
+  const handleSummarize = async () => {
+    setIsSummarizing(true);
+    setSummary('');
+    setShowSummaryModal(true);
+
+    try {
+      // Fetch recent messages from the channel
+      const messagesResponse = await messageApi.get<{ messages: Message[] }>(
+        `/channels/${channel.id}/messages?limit=50`
+      );
+
+      const messageContents = messagesResponse.messages
+        .map((msg: Message) => msg.content)
+        .filter((content: string) => content && content.trim())
+        .reverse(); // Oldest first
+
+      if (messageContents.length === 0) {
+        setSummary('No messages to summarize in this channel.');
+        return;
+      }
+
+      // Call AI service to summarize
+      const response = await fetch(`${AI_SERVICE_URL}/summarize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messageContents }),
+      });
+
+      if (!response.ok) {
+        // Check for rate limit error (429)
+        if (response.status === 429) {
+          throw new Error('RATE_LIMIT');
+        }
+        
+        // Try to get error details from response
+        let errorDetail = '';
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.detail || '';
+        } catch {
+          // Ignore JSON parse errors
+        }
+        
+        // Check for quota error in 500 responses
+        if (response.status === 500 && errorDetail.toLowerCase().includes('quota')) {
+          throw new Error('RATE_LIMIT');
+        }
+        throw new Error('Failed to summarize');
+      }
+
+      const data = await response.json();
+      setSummary(data.summary);
+    } catch (error: any) {
+      console.error('Failed to summarize:', error);
+      if (error.message === 'RATE_LIMIT') {
+        setSummary('⚠️ AI API rate limit exceeded. The free tier daily quota has been exhausted. Please try again tomorrow or upgrade to a paid API plan.');
+      } else {
+        setSummary('Failed to generate summary. Please try again.');
+      }
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   return (
     <div className="h-14 border-b border-gray-200 px-4 flex items-center justify-between bg-white">
       <div className="flex items-center space-x-2">
@@ -184,6 +263,20 @@ export function ChannelHeader({ channel, onSearch }: ChannelHeaderProps) {
             <Moon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
           ) : (
             <Sun className="h-5 w-5 text-yellow-500" />
+          )}
+        </button>
+
+        {/* Summarize Button */}
+        <button
+          onClick={handleSummarize}
+          disabled={isSummarizing}
+          className="p-2 hover:bg-green-100 rounded transition-colors"
+          title="Summarize conversation"
+        >
+          {isSummarizing ? (
+            <Loader2 className="h-5 w-5 text-green-600 animate-spin" />
+          ) : (
+            <FileText className="h-5 w-5 text-green-600" />
           )}
         </button>
 
@@ -320,6 +413,55 @@ export function ChannelHeader({ channel, onSearch }: ChannelHeaderProps) {
           </div>
         )}
       </div>
+
+      {/* Summary Modal */}
+      {showSummaryModal && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowSummaryModal(false)}
+          />
+
+          {/* Modal */}
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-50 w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-green-600" />
+                Conversation Summary
+              </h3>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="text-sm text-gray-700 whitespace-pre-wrap">
+              {isSummarizing ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 text-green-600 animate-spin" />
+                  <span className="ml-3 text-gray-500">Generating summary...</span>
+                </div>
+              ) : (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  {summary}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

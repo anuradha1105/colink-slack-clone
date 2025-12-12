@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import { authApi, filesApi } from '@/lib/api';
 import { User } from '@/types';
-import { X, Pencil, Loader2 } from 'lucide-react';
+import { X, Pencil, Loader2, Shield } from 'lucide-react';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -242,6 +242,26 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 {user?.phone_number || 'Not set'}
               </div>
             )}
+          </div>
+
+          {/* Security Settings */}
+          <div className="pt-4 border-t">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Security
+            </label>
+            <a
+              href="http://localhost:8080/realms/colink/account/#/security/signingin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors group"
+            >
+              <Shield className="h-5 w-5 text-purple-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">Two-Factor Authentication (2FA)</p>
+                <p className="text-xs text-gray-500">Set up authenticator app for extra security</p>
+              </div>
+              <span className="text-purple-600 text-sm group-hover:underline">Configure →</span>
+            </a>
           </div>
         </div>
 

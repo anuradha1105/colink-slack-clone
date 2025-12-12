@@ -1,108 +1,147 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
-import { config } from './config';
-import { AuthService } from './auth';
+import { config } from '@/lib/config';
+import { AuthService } from '@/lib/auth';
 
-export class ApiClient {
-  private client: AxiosInstance;
+class ApiClient {
+  private baseUrl: string;
 
-  constructor(baseURL: string) {
-    this.client = axios.create({
-      baseURL,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  private async getAuthHeaders(isFormData: boolean = false): Promise<HeadersInit> {
+    const token = AuthService.getAccessToken();
+    const headers: HeadersInit = {};
+
+    // Don't set Content-Type for FormData - browser will set it with boundary
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    return headers;
+  }
+
+  async get<T>(endpoint: string): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers,
     });
 
-    // Request interceptor to add auth token
-    this.client.interceptors.request.use(
-      (config) => {
-        const tokens = AuthService.getTokens();
-        if (tokens?.access_token) {
-          config.headers.Authorization = `Bearer ${tokens.access_token}`;
-          console.log('[API] Adding auth header to request:', config.url);
-        } else {
-          console.warn('[API] No access token available for request:', config.url);
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Token expired or invalid, redirect to login
+        AuthService.clearAuth();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
         }
-
-        // If sending FormData, remove Content-Type to let browser set it with boundary
-        if (config.data instanceof FormData) {
-          delete config.headers['Content-Type'];
-        }
-
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    // Response interceptor to handle token refresh
-    this.client.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          console.log('[API] Got 401 error, attempting token refresh...');
-          originalRequest._retry = true;
-
-          try {
-            const tokens = AuthService.getTokens();
-            if (tokens?.refresh_token) {
-              console.log('[API] Refreshing token...');
-              const newTokens = await AuthService.refreshToken(tokens.refresh_token);
-              AuthService.saveTokens(newTokens);
-              console.log('[API] Token refreshed successfully, retrying request');
-              originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`;
-              return this.client(originalRequest);
-            } else {
-              console.warn('[API] No refresh token available');
-            }
-          } catch (refreshError) {
-            console.error('[API] Token refresh failed, clearing auth and redirecting to login', refreshError);
-            AuthService.clearAuth();
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
-            }
-            return Promise.reject(refreshError);
-          }
-        }
-
-        return Promise.reject(error);
       }
-    );
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.get<T>(url, config);
-    return response.data;
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
+    const isFormData = data instanceof FormData;
+    const headers = await this.getAuthHeaders(isFormData);
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: isFormData ? data : (data ? JSON.stringify(data) : undefined),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        AuthService.clearAuth();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.post<T>(url, data, config);
-    return response.data;
+  async put<T>(endpoint: string, data?: unknown): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'PUT',
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        AuthService.clearAuth();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.put<T>(url, data, config);
-    return response.data;
+  async delete<T>(endpoint: string): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'DELETE',
+      headers,
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        AuthService.clearAuth();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 
-  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.patch<T>(url, data, config);
-    return response.data;
-  }
+  async patch<T>(endpoint: string, data?: unknown): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'PATCH',
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+    });
 
-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.delete<T>(url, config);
-    return response.data;
+    if (!response.ok) {
+      if (response.status === 401) {
+        AuthService.clearAuth();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
   }
 }
 
-// API client instances
-export const authApi = new ApiClient(config.api.authProxy);
-export const channelApi = new ApiClient(config.api.channel);
-export const messageApi = new ApiClient(config.api.message);
-export const threadsApi = new ApiClient(config.api.threads);
-export const reactionsApi = new ApiClient(config.api.reactions);
-export const filesApi = new ApiClient(config.api.files);
-export const notificationsApi = new ApiClient(config.api.notifications);
-export const analyticsApi = new ApiClient(config.api.message); // Analytics endpoints are on message service
+// Create API client instances
+// Auth-proxy handles authentication endpoints
+export const api = new ApiClient(config.api.url);
+export const authApi = new ApiClient(config.api.url);
+export const userApi = new ApiClient(config.api.url);
+
+// Direct service clients
+export const channelApi = new ApiClient(config.channelService.url);
+export const messageApi = new ApiClient(config.messageService.url);
+export const fileApi = new ApiClient(config.filesService.url);
+export const filesApi = new ApiClient(config.filesService.url);
+export const threadsApi = new ApiClient(config.threadsService.url);
+
+// Analytics API uses the message service directly for BI dashboard
+export const analyticsApi = new ApiClient(config.messageService.url);

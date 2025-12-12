@@ -107,7 +107,10 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Add CORS middleware
+# Add authentication middleware FIRST (runs after CORS due to reverse order)
+app.add_middleware(AuthMiddleware)
+
+# Add CORS middleware LAST (runs first due to reverse order, adds headers even on 401)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
@@ -115,9 +118,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Add authentication middleware
-app.add_middleware(AuthMiddleware)
 
 # Include routers
 app.include_router(health.router, tags=["Health"])

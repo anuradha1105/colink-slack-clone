@@ -3,8 +3,11 @@
 import { useState, useRef, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { messageApi, filesApi } from '@/lib/api';
-import { Send, Paperclip, Smile, X } from 'lucide-react';
+import { Send, Paperclip, Smile, X, Sparkles, Check, XCircle, Loader2 } from 'lucide-react';
 import { useWebSocket } from '@/contexts/WebSocketContext';
+
+// AI Service URL for rephrase feature
+const AI_SERVICE_URL = process.env.NEXT_PUBLIC_AI_SERVICE_URL || 'http://localhost:8011';
 
 interface MessageInputProps {
   channelId: string;
@@ -18,11 +21,20 @@ interface UploadedFile {
   size: number;
 }
 
+interface RephraseResponse {
+  original: string;
+  rephrased: string;
+  was_changed: boolean;
+}
+
 export function MessageInput({ channelId }: MessageInputProps) {
   const [content, setContent] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRephrasing, setIsRephrasing] = useState(false);
+  const [rephrasedText, setRephrasedText] = useState<string | null>(null);
+  const [showRephrasePreview, setShowRephrasePreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { sendTyping } = useWebSocket();
@@ -95,11 +107,54 @@ export function MessageInput({ channelId }: MessageInputProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Allow sending if there's content OR attachments
     if (content.trim() || attachedFiles.length > 0) {
-      sendMessageMutation.mutate(content.trim() || '📎'); // Use paperclip emoji if no text
+      const messageContent = content.trim() || '📎';
+
+      // Check for @AI pattern
+      const aiMatch = messageContent.match(/@AI\s+(.+)/i);
+
+      // Send the user's message first
+      sendMessageMutation.mutate(messageContent);
+
+      // If @AI was mentioned, get AI response
+      if (aiMatch && aiMatch[1]) {
+        const question = aiMatch[1].trim();
+
+        try {
+          // Call AI service
+          const response = await fetch(`${AI_SERVICE_URL}/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+
+            // Post AI response as a follow-up message
+            await messageApi.post('/messages', {
+              content: `🤖 **AI Assistant:** ${data.answer}`,
+              channel_id: channelId,
+              message_type: 'text',
+            });
+
+            // Refetch messages to show AI response
+            await queryClient.refetchQueries({ queryKey: ['messages', channelId] });
+          }
+        } catch (error) {
+          console.error('Failed to get AI response:', error);
+          // Post error message
+          await messageApi.post('/messages', {
+            content: '🤖 **AI Assistant:** Sorry, I couldn\'t process your request. Please try again.',
+            channel_id: channelId,
+            message_type: 'text',
+          });
+          await queryClient.refetchQueries({ queryKey: ['messages', channelId] });
+        }
+      }
     }
   };
 
@@ -113,6 +168,58 @@ export function MessageInput({ channelId }: MessageInputProps) {
   const handleEmojiClick = (emoji: string) => {
     setContent(prev => prev + emoji);
     setShowEmojiPicker(false);
+  };
+
+  // Smart Rephrase handler - calls AI service to improve message phrasing
+  const handleRephrase = async () => {
+    if (!content.trim() || content.trim().length < 5) return;
+
+    setIsRephrasing(true);
+    setShowRephrasePreview(false);
+
+    try {
+      const response = await fetch(`${AI_SERVICE_URL}/rephrase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: content.trim() }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to rephrase message');
+      }
+
+      const data: RephraseResponse = await response.json();
+
+      if (data.was_changed && data.rephrased !== content.trim()) {
+        setRephrasedText(data.rephrased);
+        setShowRephrasePreview(true);
+      } else {
+        // Message was already well-phrased
+        setRephrasedText(null);
+        setShowRephrasePreview(false);
+      }
+    } catch (error) {
+      console.error('Failed to rephrase message:', error);
+    } finally {
+      setIsRephrasing(false);
+    }
+  };
+
+  // Accept the rephrased text
+  const handleAcceptRephrase = () => {
+    if (rephrasedText) {
+      setContent(rephrasedText);
+      setRephrasedText(null);
+      setShowRephrasePreview(false);
+    }
+  };
+
+  // Dismiss the rephrase suggestion
+  const handleDismissRephrase = () => {
+    setRephrasedText(null);
+    setShowRephrasePreview(false);
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,6 +299,38 @@ export function MessageInput({ channelId }: MessageInputProps) {
               rows={1}
               disabled={sendMessageMutation.isPending || isUploading}
             />
+
+            {/* Smart Rephrase Preview */}
+            {showRephrasePreview && rephrasedText && (
+              <div className="mx-4 mb-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-purple-600 font-medium mb-1">Suggested rephrase:</p>
+                    <p className="text-sm text-gray-800">{rephrasedText}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2 ml-6">
+                  <button
+                    type="button"
+                    onClick={handleAcceptRephrase}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded transition-colors"
+                  >
+                    <Check className="h-3 w-3" />
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDismissRephrase}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    <XCircle className="h-3 w-3" />
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-4 pb-3 pt-1">
               <div className="flex items-center space-x-2 relative">
                 <input
@@ -222,6 +361,21 @@ export function MessageInput({ channelId }: MessageInputProps) {
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 >
                   <Smile className="h-5 w-5 text-gray-600" />
+                </button>
+
+                {/* Smart Rephrase Button */}
+                <button
+                  type="button"
+                  onClick={handleRephrase}
+                  disabled={isRephrasing || !content.trim() || content.trim().length < 5}
+                  className="p-1 hover:bg-purple-100 rounded disabled:opacity-50 disabled:cursor-not-allowed group"
+                  title="Smart Rephrase - Fix grammar and improve phrasing"
+                >
+                  {isRephrasing ? (
+                    <Loader2 className="h-5 w-5 text-purple-600 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-5 w-5 text-purple-600 group-hover:text-purple-700" />
+                  )}
                 </button>
 
                 {/* Emoji Picker */}
